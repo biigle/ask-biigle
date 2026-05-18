@@ -89,8 +89,11 @@ class ChatController extends Controller
                 ->implode("\n");
         }
 
+        $rawContent = (string) ($content ?? '');
+
         return response()->json([
-            'assistant' => $this->cleanAssistantContent((string) ($content ?? '')),
+            'assistant' => $this->cleanAssistantContent($rawContent),
+            'sources' => $this->extractSources($rawContent),
         ]);
     }
 
@@ -104,10 +107,64 @@ class ChatController extends Controller
     {
         $cleaned = str_replace("\r\n", "\n", $content);
         $cleaned = preg_replace('/\n?-{3,}\s*References?:[\s\S]*$/i', '', $cleaned);
-        $cleaned = preg_replace('/\n\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i', '', $cleaned);
+        $cleaned = preg_replace('/\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i', '', $cleaned);
         $cleaned = preg_replace('/\s*\[(?:RREF|REF)\d+\]/i', '', $cleaned);
         $cleaned = preg_replace("/\n{3,}/", "\n\n", $cleaned);
 
         return trim($cleaned);
+    }
+
+    /**
+     * Extract retrieval sources from a reference section.
+     *
+     * @param string $content
+     * @return array
+     */
+    protected function extractSources($content)
+    {
+        $normalized = str_replace("\r\n", "\n", $content);
+        if (!preg_match('/References?:\s*(\[(?:RREF|REF)\d+\][\s\S]*)$/i', $normalized, $matches)) {
+            return [];
+        }
+
+        $referenceSection = $matches[1];
+        preg_match_all('/\[((?:RREF|REF)\d+)\]\s*([\s\S]*?)(?=\[(?:RREF|REF)\d+\]|$)/i', $referenceSection, $chunks, PREG_SET_ORDER);
+
+        $sources = [];
+        foreach ($chunks as $chunk) {
+            $id = strtoupper($chunk[1]);
+            $entry = trim($chunk[2]);
+            if ($entry === '') {
+                continue;
+            }
+
+            $title = 'Source';
+            $score = null;
+            $snippet = $entry;
+
+            if (preg_match('/^([^\n(]+?)\s*\(([\d.]+)\)\s*([\s\S]*)$/', $entry, $parts)) {
+                $title = trim($parts[1]);
+                $score = (float) $parts[2];
+                $snippet = trim($parts[3]);
+            }
+
+            $snippet = trim(preg_replace('/\s+/', ' ', strip_tags($snippet)));
+            if (strlen($snippet) > 220) {
+                $snippet = substr($snippet, 0, 220).'...';
+            }
+
+            $sources[] = [
+                'id' => $id,
+                'title' => $title,
+                'score' => $score,
+                'snippet' => $snippet,
+            ];
+
+            if (count($sources) >= 10) {
+                break;
+            }
+        }
+
+        return $sources;
     }
 }

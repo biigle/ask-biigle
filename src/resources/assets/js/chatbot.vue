@@ -15,6 +15,47 @@
                         <div class="biiglebot-bubble">
                             <div class="biiglebot-bubble__role">{{ roleLabel(message.role) }}</div>
                             <div class="biiglebot-bubble__content" v-html="renderMessageHtml(message)"></div>
+                            <div v-if="message.role === 'assistant' && message.sources.length > 0" class="biiglebot-sources">
+                                <div class="biiglebot-source-chips">
+                                    <button
+                                        v-for="(source, sourceIndex) in message.sources"
+                                        :key="`${index}-chip-${sourceIndex}`"
+                                        type="button"
+                                        class="biiglebot-source-chip"
+                                        :title="source.title"
+                                        @click="openSource(index, source.id)"
+                                        >
+                                        {{ source.id }}
+                                    </button>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn btn-link btn-xs biiglebot-sources-toggle"
+                                    @click="toggleSources(index)"
+                                    >
+                                    {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
+                                </button>
+                                <div v-if="message.sourcesExpanded" class="biiglebot-sources-panel">
+                                    <div
+                                        v-for="(source, sourceIndex) in message.sources"
+                                        :key="`${index}-source-${sourceIndex}`"
+                                        :id="sourceElementId(index, source.id)"
+                                        class="biiglebot-source-item"
+                                        :class="{'biiglebot-source-item--active': message.activeSourceId === source.id}"
+                                        >
+                                        <div class="biiglebot-source-item__title">
+                                            <strong>{{ source.id }}</strong>
+                                            <span>{{ source.title }}</span>
+                                            <span v-if="source.score !== null" class="biiglebot-source-score">
+                                                {{ source.score.toFixed(3) }}
+                                            </span>
+                                        </div>
+                                        <div v-if="source.snippet" class="biiglebot-source-item__snippet">
+                                            {{ source.snippet }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -59,7 +100,7 @@ function escapeHtml(value) {
 function stripRagArtifacts(value) {
     let cleaned = value.replace(/\r\n/g, '\n');
     cleaned = cleaned.replace(/\n?-{3,}\s*References?:[\s\S]*$/i, '');
-    cleaned = cleaned.replace(/\n\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i, '');
+    cleaned = cleaned.replace(/\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i, '');
     cleaned = cleaned.replace(/\s*\[(?:RREF|REF)\d+\]/gi, '');
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
@@ -197,10 +238,43 @@ export default {
                 }
             });
         },
-        addMessage(role, content) {
+        addMessage(role, content, sources = []) {
             const normalizedContent = role === 'assistant' ? stripRagArtifacts(content) : content;
-            this.messages.push({role, content: normalizedContent});
+            this.messages.push({
+                role,
+                content: normalizedContent,
+                sources: Array.isArray(sources) ? sources : [],
+                sourcesExpanded: false,
+                activeSourceId: null,
+            });
             this.scrollToBottom();
+        },
+        toggleSources(index) {
+            if (!this.messages[index]) {
+                return;
+            }
+
+            this.messages[index].sourcesExpanded = !this.messages[index].sourcesExpanded;
+        },
+        sourceElementId(messageIndex, sourceId) {
+            const safeId = String(sourceId).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+
+            return `biiglebot-source-${messageIndex}-${safeId}`;
+        },
+        openSource(messageIndex, sourceId) {
+            const message = this.messages[messageIndex];
+            if (!message) {
+                return;
+            }
+
+            message.sourcesExpanded = true;
+            message.activeSourceId = sourceId;
+            this.$nextTick(() => {
+                const target = document.getElementById(this.sourceElementId(messageIndex, sourceId));
+                if (target) {
+                    target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+                }
+            });
         },
         renderMessageHtml(message) {
             if (message.role === 'user') {
@@ -248,7 +322,11 @@ export default {
                     return;
                 }
 
-                this.addMessage('assistant', data && data.assistant ? data.assistant : '');
+                this.addMessage(
+                    'assistant',
+                    data && data.assistant ? data.assistant : '',
+                    data && Array.isArray(data.sources) ? data.sources : []
+                );
             } catch {
                 this.addMessage('error', 'Could not reach BIIGLEBot backend.');
             } finally {
@@ -283,9 +361,9 @@ export default {
     </span>
 </a>`;
 
-            const firstDropdown = navList.querySelector('li[is="vue:dropdown"]');
-            if (firstDropdown) {
-                navList.insertBefore(item, firstDropdown);
+            const lastItem = navList.lastElementChild;
+            if (lastItem) {
+                navList.insertBefore(item, lastItem);
             } else {
                 navList.appendChild(item);
             }
