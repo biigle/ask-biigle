@@ -1,9 +1,12 @@
 {
   "src/resources/assets/js/chatbot.js": {
-    "file": "assets/chatbot-DWuKbwzA.js",
+    "file": "assets/chatbot-Cq8HkSnW.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.js",
-    "isEntry": true
+    "isEntry": true,
+    "css": [
+      "assets/chatbot-CMjN-BLK.css"
+    ]
   },
   "src/resources/assets/js/main.js": {
     "file": "assets/main-DR129_84.js",
@@ -12,7 +15,7 @@
     "isEntry": true
   },
   "src/resources/assets/sass/chatbot.scss": {
-    "file": "assets/chatbot-Cq6Xjrp5.css",
+    "file": "assets/chatbot-CMjN-BLK.css",
     "src": "src/resources/assets/sass/chatbot.scss",
     "isEntry": true
   },

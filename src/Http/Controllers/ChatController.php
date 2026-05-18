@@ -38,7 +38,7 @@ class ChatController extends Controller
         $messages = [
             [
                 'role' => 'system',
-                'content' => config('biiglebot.llm_system_prompt'),
+                'content' => trim(config('biiglebot.llm_system_prompt')."\n\nUse Markdown for formatting. Do not output retrieval references, source dumps, or markers like [RREF1]."),
             ],
         ];
 
@@ -90,7 +90,24 @@ class ChatController extends Controller
         }
 
         return response()->json([
-            'assistant' => (string) ($content ?? ''),
+            'assistant' => $this->cleanAssistantContent((string) ($content ?? '')),
         ]);
+    }
+
+    /**
+     * Remove retrieval/source artifacts from the assistant response.
+     *
+     * @param string $content
+     * @return string
+     */
+    protected function cleanAssistantContent($content)
+    {
+        $cleaned = str_replace("\r\n", "\n", $content);
+        $cleaned = preg_replace('/\n?-{3,}\s*References?:[\s\S]*$/i', '', $cleaned);
+        $cleaned = preg_replace('/\n\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i', '', $cleaned);
+        $cleaned = preg_replace('/\s*\[(?:RREF|REF)\d+\]/i', '', $cleaned);
+        $cleaned = preg_replace("/\n{3,}/", "\n\n", $cleaned);
+
+        return trim($cleaned);
     }
 }
