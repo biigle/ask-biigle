@@ -1,0 +1,1 @@
+let t=biigle.$require("handleErrorResponse");const s={data(){return{quote:""}},methods:{refreshQuote(){fetch("quotes/new").then(e=>e.text()).then(this.handleResponse).catch(t)},handleResponse(e){this.quote=e}},created(){this.refreshQuote()}};biigle.$mount("quotes-container",s);
