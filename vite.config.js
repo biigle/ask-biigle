@@ -11,9 +11,7 @@ export default defineConfig({
             publicDirectory: 'src',
             buildDirectory: 'public',
             input: [
-                'src/resources/assets/sass/main.scss',
                 'src/resources/assets/sass/chatbot.scss',
-                'src/resources/assets/js/main.js',
                 'src/resources/assets/js/chatbot.js',
             ],
             hotFile: 'hot',

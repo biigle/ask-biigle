@@ -8,20 +8,9 @@
       "assets/chatbot-BCkTXnRK.css"
     ]
   },
-  "src/resources/assets/js/main.js": {
-    "file": "assets/main-DR129_84.js",
-    "name": "main",
-    "src": "src/resources/assets/js/main.js",
-    "isEntry": true
-  },
   "src/resources/assets/sass/chatbot.scss": {
     "file": "assets/chatbot-BCkTXnRK.css",
     "src": "src/resources/assets/sass/chatbot.scss",
-    "isEntry": true
-  },
-  "src/resources/assets/sass/main.scss": {
-    "file": "assets/main-DMqqqQxT.css",
-    "src": "src/resources/assets/sass/main.scss",
     "isEntry": true
   }
 }

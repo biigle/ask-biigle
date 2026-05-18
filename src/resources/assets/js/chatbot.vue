@@ -97,16 +97,6 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function stripRagArtifacts(value) {
-    let cleaned = value.replace(/\r\n/g, '\n');
-    cleaned = cleaned.replace(/\n?-{3,}\s*References?:[\s\S]*$/i, '');
-    cleaned = cleaned.replace(/\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i, '');
-    cleaned = cleaned.replace(/\s*\[(?:RREF|REF)\d+\]/gi, '');
-    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-
-    return cleaned.trim();
-}
-
 function renderInlineMarkdown(value) {
     let html = escapeHtml(value);
     html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -122,6 +112,9 @@ function renderMarkdown(value) {
     const html = [];
     let inUnorderedList = false;
     let inOrderedList = false;
+    let inCodeBlock = false;
+    let codeLanguage = '';
+    let codeLines = [];
 
     const closeLists = () => {
         if (inUnorderedList) {
@@ -135,7 +128,34 @@ function renderMarkdown(value) {
         }
     };
 
+    const closeCodeBlock = () => {
+        const languageClass = codeLanguage ? ` class="language-${escapeHtml(codeLanguage)}"` : '';
+        const code = escapeHtml(codeLines.join('\n'));
+        html.push(`<pre><code${languageClass}>${code}</code></pre>`);
+        inCodeBlock = false;
+        codeLanguage = '';
+        codeLines = [];
+    };
+
     lines.forEach((line) => {
+        const fenceMatch = line.match(/^\s*```([^\s`]+)?\s*$/);
+        if (fenceMatch) {
+            if (inCodeBlock) {
+                closeCodeBlock();
+            } else {
+                closeLists();
+                inCodeBlock = true;
+                codeLanguage = fenceMatch[1] || '';
+                codeLines = [];
+            }
+            return;
+        }
+
+        if (inCodeBlock) {
+            codeLines.push(line);
+            return;
+        }
+
         const headingMatch = line.match(/^\s*(#{1,6})\s*(.+)$/);
         const unorderedMatch = line.match(/^\s*[-*]\s+(.*)$/);
         const orderedMatch = line.match(/^\s*\d+\.\s+(.*)$/);
@@ -175,6 +195,10 @@ function renderMarkdown(value) {
 
         html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
     });
+
+    if (inCodeBlock) {
+        closeCodeBlock();
+    }
 
     closeLists();
 
@@ -239,10 +263,9 @@ export default {
             });
         },
         addMessage(role, content, sources = []) {
-            const normalizedContent = role === 'assistant' ? stripRagArtifacts(content) : content;
             this.messages.push({
                 role,
-                content: normalizedContent,
+                content,
                 sources: Array.isArray(sources) ? sources : [],
                 sourcesExpanded: false,
                 activeSourceId: null,
@@ -281,7 +304,7 @@ export default {
                 return `<p>${escapeHtml(message.content)}</p>`;
             }
 
-            return renderMarkdown(stripRagArtifacts(message.content));
+            return renderMarkdown(message.content);
         },
         clearChat() {
             this.messages = [];

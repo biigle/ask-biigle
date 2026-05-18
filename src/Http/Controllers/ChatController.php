@@ -21,7 +21,7 @@ class ChatController extends Controller
     {
         $validated = $this->validate($request, [
             'message' => 'required|string',
-            'history' => 'sometimes|array',
+            'history' => 'sometimes|array|max:20',
             'history.*.role' => 'required_with:history|string|in:user,assistant',
             'history.*.content' => 'required_with:history|string',
         ]);

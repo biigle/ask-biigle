@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\Tests\Modules\Module;
+namespace Biigle\Tests\Modules\BIIGLEBot;
 
 use Biigle\Modules\BIIGLEBot\BIIGLEBotServiceProvider;
 use TestCase;
