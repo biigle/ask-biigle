@@ -68,6 +68,16 @@
                             </div>
                         </div>
                     </div>
+                    <div v-if="pending" class="biiglebot-row biiglebot-row--assistant">
+                        <div class="biiglebot-bubble">
+                            <div class="biiglebot-bubble__role">BIIGLEBot</div>
+                            <div class="biiglebot-typing-indicator">
+                                <span class="biiglebot-typing-dot"></span>
+                                <span class="biiglebot-typing-dot"></span>
+                                <span class="biiglebot-typing-dot"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="panel-footer biiglebot-footer">
                     <textarea
@@ -80,9 +90,11 @@
                         @keydown="handleKeyDown"
                         ></textarea>
                     <div class="biiglebot-actions">
-                        <button class="btn btn-default" :disabled="pending" @click="clearChat">Clear</button>
-                        <button class="btn btn-primary" :disabled="pending || !canSend" @click="sendMessage">
-                            {{ pending ? 'Sending...' : 'Send' }}
+                        <button class="btn btn-default biiglebot-btn-icon" :disabled="pending" title="Clear chat" @click="clearChat">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                        <button class="btn btn-primary biiglebot-btn-icon" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
+                            <i class="fa fa-paper-plane"></i>
                         </button>
                     </div>
                 </div>
