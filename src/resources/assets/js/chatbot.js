@@ -5,6 +5,7 @@ const MAX_HISTORY_ITEMS = 20;
 
 let history = [];
 let pending = false;
+let fallbackBackdrop = null;
 
 function getCsrfToken() {
     const tokenTag = document.querySelector('meta[name="csrf-token"]');
@@ -166,6 +167,23 @@ function ensureModal() {
                 event.preventDefault();
                 sendMessage();
             }
+            if (event.key === 'Escape') {
+                hideModal();
+            }
+        });
+    }
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            hideModal();
+        }
+    });
+
+    const closeButton = modal.querySelector('[data-dismiss="modal"]');
+    if (closeButton) {
+        closeButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            hideModal();
         });
     }
 
@@ -180,13 +198,70 @@ function ensureModal() {
     }
 }
 
+function hasBootstrapModal(jq) {
+    if (!jq) {
+        return false;
+    }
+
+    const modalEl = jq(`#${MODAL_ID}`);
+
+    return modalEl && typeof modalEl.modal === 'function';
+}
+
+function showFallbackModal() {
+    const modal = document.getElementById(MODAL_ID);
+    if (!modal) {
+        return;
+    }
+
+    modal.style.display = 'block';
+    modal.classList.add('in');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+
+    if (!fallbackBackdrop) {
+        fallbackBackdrop = document.createElement('div');
+        fallbackBackdrop.className = 'modal-backdrop fade in';
+        document.body.appendChild(fallbackBackdrop);
+    }
+
+    const field = document.getElementById('biiglebot-input');
+    if (field) {
+        field.focus();
+    }
+}
+
+function hideModal() {
+    const jq = window.jQuery || window.$;
+    if (hasBootstrapModal(jq)) {
+        jq(`#${MODAL_ID}`).modal('hide');
+        return;
+    }
+
+    const modal = document.getElementById(MODAL_ID);
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('in');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.body.classList.remove('modal-open');
+    if (fallbackBackdrop) {
+        fallbackBackdrop.remove();
+        fallbackBackdrop = null;
+    }
+}
+
 function showModal() {
     ensureModal();
 
     const jq = window.jQuery || window.$;
-    if (jq) {
+    if (hasBootstrapModal(jq)) {
         jq(`#${MODAL_ID}`).modal('show');
+        return;
     }
+
+    showFallbackModal();
 }
 
 function insertButton() {
@@ -212,11 +287,6 @@ function insertButton() {
         <i class="fa fa-comments"></i>
     </span>
 </a>`;
-    item.addEventListener('click', (event) => {
-        event.preventDefault();
-        showModal();
-    });
-
     const firstDropdown = navList.querySelector('li[is="vue:dropdown"]');
     if (firstDropdown) {
         navList.insertBefore(item, firstDropdown);
@@ -224,5 +294,15 @@ function insertButton() {
         navList.appendChild(item);
     }
 }
+
+document.addEventListener('click', (event) => {
+    const target = event.target.closest(`#${OPEN_BUTTON_ID}`);
+    if (!target) {
+        return;
+    }
+
+    event.preventDefault();
+    showModal();
+});
 
 insertButton();

@@ -1,0 +1,24 @@
+const d="biiglebot-modal",m="biiglebot-open-button",E="/biiglebot/chat";let r=[],p=!1,l=null;function h(){const e=document.querySelector('meta[name="csrf-token"]');return e?e.getAttribute("content"):""}function b(e,t){return{role:e,content:t}}function c(e,t,n){const o=document.createElement("div");o.className=`biiglebot-message biiglebot-message--${t}`;const i=document.createElement("span");i.className="biiglebot-message__role",i.textContent=t==="assistant"?"BIIGLEBot":t==="user"?"You":"Error";const a=document.createElement("span");a.className="biiglebot-message__content",a.textContent=n,o.appendChild(i),o.appendChild(a),e.appendChild(o),e.scrollTop=e.scrollHeight}function B(e){e.innerHTML="",r.forEach(t=>{c(e,t.role,t.content)})}function f(e){p=e;const t=document.getElementById("biiglebot-send"),n=document.getElementById("biiglebot-clear"),o=document.getElementById("biiglebot-input");t&&(t.disabled=e,t.textContent=e?"Sending...":"Send"),n&&(n.disabled=e),o&&(o.disabled=e)}async function g(){if(p)return;const e=document.getElementById("biiglebot-input"),t=document.getElementById("biiglebot-messages");if(!e||!t)return;const n=e.value.trim();if(n){r.push(b("user",n)),c(t,"user",n),e.value="",f(!0);try{const o=await fetch(E,{method:"POST",headers:{Accept:"application/json","Content-Type":"application/json","X-CSRF-TOKEN":h()},body:JSON.stringify({message:n,history:r.slice(-20)})}),i=await o.json();if(!o.ok){const s=i&&i.message?i.message:"Request failed.";c(t,"error",s);return}const a=i&&i.assistant?i.assistant:"";r.push(b("assistant",a)),c(t,"assistant",a)}catch{c(t,"error","Could not reach BIIGLEBot backend.")}finally{f(!1)}}}function v(){r=[];const e=document.getElementById("biiglebot-messages");e&&B(e)}function I(){if(document.getElementById(d))return;const e=document.createElement("div");e.id=d,e.className="modal fade",e.tabIndex=-1,e.setAttribute("role","dialog"),e.innerHTML=`
+<div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            <h4 class="modal-title">BIIGLEBot</h4>
+        </div>
+        <div class="modal-body">
+            <div id="biiglebot-messages" class="biiglebot-messages"></div>
+            <div class="biiglebot-input">
+                <textarea id="biiglebot-input" class="form-control" rows="3" placeholder="Ask BIIGLEBot..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="biiglebot-clear" class="btn btn-default">Clear</button>
+            <button type="button" id="biiglebot-send" class="btn btn-primary">Send</button>
+        </div>
+    </div>
+</div>`,document.body.appendChild(e);const t=document.getElementById("biiglebot-send"),n=document.getElementById("biiglebot-clear"),o=document.getElementById("biiglebot-input");t&&t.addEventListener("click",g),n&&n.addEventListener("click",v),o&&o.addEventListener("keydown",s=>{s.key==="Enter"&&!s.shiftKey&&(s.preventDefault(),g()),s.key==="Escape"&&u()}),e.addEventListener("click",s=>{s.target===e&&u()});const i=e.querySelector('[data-dismiss="modal"]');i&&i.addEventListener("click",s=>{s.preventDefault(),u()});const a=window.jQuery||window.$;a&&a(`#${d}`).on("shown.bs.modal",()=>{const s=document.getElementById("biiglebot-input");s&&s.focus()})}function y(e){if(!e)return!1;const t=e(`#${d}`);return t&&typeof t.modal=="function"}function w(){const e=document.getElementById(d);if(!e)return;e.style.display="block",e.classList.add("in"),e.setAttribute("aria-hidden","false"),document.body.classList.add("modal-open"),l||(l=document.createElement("div"),l.className="modal-backdrop fade in",document.body.appendChild(l));const t=document.getElementById("biiglebot-input");t&&t.focus()}function u(){const e=window.jQuery||window.$;if(y(e)){e(`#${d}`).modal("hide");return}const t=document.getElementById(d);t&&(t.style.display="none",t.classList.remove("in"),t.setAttribute("aria-hidden","true")),document.body.classList.remove("modal-open"),l&&(l.remove(),l=null)}function k(){I();const e=window.jQuery||window.$;if(y(e)){e(`#${d}`).modal("show");return}w()}function L(){if(document.getElementById(m))return;const e=document.getElementById("navbar-right");if(!e)return;const t=e.querySelector("ul.navbar-nav");if(!t)return;const n=document.createElement("li");n.id=m,n.innerHTML=`
+<a href="#" class="navbar-btn-link" title="Open BIIGLEBot">
+    <span class="btn btn-default">
+        <i class="fa fa-comments"></i>
+    </span>
+</a>`;const o=t.querySelector('li[is="vue:dropdown"]');o?t.insertBefore(n,o):t.appendChild(n)}document.addEventListener("click",e=>{e.target.closest(`#${m}`)&&(e.preventDefault(),k())});L();

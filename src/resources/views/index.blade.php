@@ -10,8 +10,8 @@
 @endsection
 
 @push('scripts')
-{{vite_hot(base_path('vendor/biigle/BIIGLEBot/hot'), ['src/resources/assets/js/main.js'], 'vendor/module')}}
+{{vite_hot(base_path('vendor/biigle/BIIGLEBot/hot'), ['src/resources/assets/js/main.js'], 'vendor/BIIGLEBot')}}
 @endpush
 @push('styles')
-{{vite_hot(base_path('vendor/biigle/BIIGLEBot/hot'), ['src/resources/assets/sass/main.scss'], 'vendor/module')}}
+{{vite_hot(base_path('vendor/biigle/BIIGLEBot/hot'), ['src/resources/assets/sass/main.scss'], 'vendor/BIIGLEBot')}}
 @endpush
