@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\Modules\Module;
+namespace Biigle\BIIGLEBot\BIIGLEBot;
 
 use Biigle\Services\Modules;
 use Illuminate\Routing\Router;
@@ -18,16 +18,16 @@ class ModuleServiceProvider extends ServiceProvider
    */
     public function boot(Modules $modules, Router $router)
     {
-        $this->loadViewsFrom(__DIR__.'/resources/views', 'module');
+        $this->loadViewsFrom(__DIR__.'/resources/views', 'BIIGLEBot');
 
         $router->group([
-            'namespace' => 'Biigle\Modules\Module\Http\Controllers',
+            'namespace' => 'Biigle\BIIGLEBot\BIIGLEBot\Http\Controllers',
             'middleware' => 'web',
         ], function ($router) {
             require __DIR__.'/Http/routes.php';
         });
 
-        $modules->register('module', [
+        $modules->register('BIIGLEBot', [
             'viewMixins' => [
                 'dashboardMain',
             ],
@@ -40,7 +40,7 @@ class ModuleServiceProvider extends ServiceProvider
         ]);
 
         $this->publishes([
-            __DIR__.'/public' => public_path('vendor/module'),
+            __DIR__.'/public' => public_path('vendor/BIIGLEBot'),
         ], 'public');
     }
 

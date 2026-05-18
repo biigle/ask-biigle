@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\Modules\Module\Http\Controllers;
+namespace Biigle\BIIGLEBot\BIIGLEBot\Http\Controllers;
 
 use Biigle\Http\Controllers\Views\Controller;
 
@@ -14,7 +14,7 @@ class QuotesController extends Controller
      */
     public function index()
     {
-        return view('module::index');
+        return view('BIIGLEBot::index');
     }
 
     /**

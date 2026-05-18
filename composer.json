@@ -1,5 +1,5 @@
 {
-    "name": "biigle/module",
+    "name": "biigle/biiglebot",
     "description": "A template for a new BIIGLE module.",
     "keywords": ["biigle", "biigle-module"],
     "license": "GPL-3.0-only",
