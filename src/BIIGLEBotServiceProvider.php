@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\BIIGLEBot\BIIGLEBot;
+namespace Biigle\Modules\BIIGLEBot;
 
 use Biigle\Services\Modules;
 use Illuminate\Routing\Router;
@@ -8,47 +8,50 @@ use Illuminate\Support\ServiceProvider;
 
 class BIIGLEBotServiceProvider extends ServiceProvider
 {
-
-   /**
-   * Bootstrap the application events.
-   *
-   * @param Modules $modules
-   * @param  Router  $router
-   * @return  void
-   */
+    /**
+     * Bootstrap the application events.
+     *
+     * @param Modules $modules
+     * @param  Router  $router
+     * @return  void
+     */
     public function boot(Modules $modules, Router $router)
     {
-        $this->loadViewsFrom(__DIR__.'/resources/views', 'BIIGLEBot');
+        $this->loadViewsFrom(__DIR__ . "/resources/views", "BIIGLEBot");
 
-        $router->group([
-            'namespace' => 'Biigle\BIIGLEBot\BIIGLEBot\Http\Controllers',
-            'middleware' => 'web',
-        ], function ($router) {
-            require __DIR__.'/Http/routes.php';
-        });
-
-        $modules->register('BIIGLEBot', [
-            'viewMixins' => [
-                'dashboardMain',
+        $router->group(
+            [
+                "namespace" => "Biigle\Modules\BIIGLEBot\Http\Controllers",
+                "middleware" => "web",
             ],
-            'controllerMixins' => [
+            function ($router) {
+                require __DIR__ . "/Http/routes.php";
+            },
+        );
+
+        $modules->register("BIIGLEBot", [
+            "viewMixins" => ["dashboardMain"],
+            "controllerMixins" => [
                 //
             ],
-            'apidoc' => [
-               //__DIR__.'/Http/Controllers/Api/',
+            "apidoc" => [
+                //__DIR__.'/Http/Controllers/Api/',
             ],
         ]);
 
-        $this->publishes([
-            __DIR__.'/public' => public_path('vendor/BIIGLEBot'),
-        ], 'public');
+        $this->publishes(
+            [
+                __DIR__ . "/public" => public_path("vendor/BIIGLEBot"),
+            ],
+            "public",
+        );
     }
 
     /**
-    * Register the service provider.
-    *
-    * @return  void
-    */
+     * Register the service provider.
+     *
+     * @return  void
+     */
     public function register()
     {
         //

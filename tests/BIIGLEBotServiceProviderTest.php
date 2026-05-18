@@ -2,7 +2,7 @@
 
 namespace Biigle\Tests\Modules\Module;
 
-use Biigle\BIIGLEBot\BIIGLEBot\BIIGLEBotServiceProvider;
+use Biigle\Modules\BIIGLEBot\BIIGLEBotServiceProvider;
 use TestCase;
 
 class BIIGLEBotServiceProviderTest extends TestCase

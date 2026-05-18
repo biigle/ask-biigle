@@ -1,12 +1,11 @@
 <?php
 
-namespace Biigle\BIIGLEBot\BIIGLEBot\Http\Controllers;
+namespace Biigle\Modules\BIIGLEBot\Http\Controllers;
 
 use Biigle\Http\Controllers\Views\Controller;
 
 class QuotesController extends Controller
 {
-
     /**
      * Shows the quotes page.
      *
@@ -14,7 +13,7 @@ class QuotesController extends Controller
      */
     public function index()
     {
-        return view('BIIGLEBot::index');
+        return view("BIIGLEBot::index");
     }
 
     /**
