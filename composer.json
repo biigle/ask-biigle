@@ -16,7 +16,7 @@
     ],
     "autoload": {
       "psr-4": {
-         "Biigle\\Modules\\Module\\": "src"
+         "Biigle\\Modules\\BIIGLEBot\\": "src"
       }
     }
 }
