@@ -30,7 +30,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
         );
 
         $modules->register("BIIGLEBot", [
-            "viewMixins" => ["dashboardMain"],
+            "viewMixins" => ["dashboardMain", "navbarMenuItem"],
             "controllerMixins" => [
                 //
             ],
@@ -54,6 +54,6 @@ class BIIGLEBotServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->mergeConfigFrom(__DIR__ . "/config/biiglebot.php", "biiglebot");
     }
 }
