@@ -15,6 +15,16 @@
                         <div class="biiglebot-bubble">
                             <div class="biiglebot-bubble__role">{{ roleLabel(message.role) }}</div>
                             <div class="biiglebot-bubble__content" v-html="renderMessageHtml(message)"></div>
+                            <button
+                                v-if="message.role === 'error'"
+                                type="button"
+                                class="biiglebot-retry-btn"
+                                title="Retry"
+                                :disabled="pending"
+                                @click="retryMessage(index)"
+                                >
+                                <i class="fa fa-refresh"></i> Retry
+                            </button>
                             <div v-if="message.role === 'assistant' && message.sources.length > 0" class="biiglebot-sources">
                                 <div class="biiglebot-source-chips">
                                     <button
@@ -262,13 +272,14 @@ export default {
                 }
             });
         },
-        addMessage(role, content, sources = []) {
+        addMessage(role, content, sources = [], failedUserMessage = null) {
             this.messages.push({
                 role,
                 content,
                 sources: Array.isArray(sources) ? sources : [],
                 sourcesExpanded: false,
                 activeSourceId: null,
+                failedUserMessage,
             });
             this.scrollToBottom();
         },
@@ -323,6 +334,9 @@ export default {
             const message = this.input.trim();
             this.input = '';
             this.addMessage('user', message);
+            await this.doSend(message);
+        },
+        async doSend(message) {
             this.pending = true;
 
             try {
@@ -341,7 +355,7 @@ export default {
 
                 const data = await response.json();
                 if (!response.ok) {
-                    this.addMessage('error', data && data.message ? data.message : 'Request failed.');
+                    this.addMessage('error', data && data.message ? data.message : 'Request failed.', [], message);
                     return;
                 }
 
@@ -351,11 +365,21 @@ export default {
                     data && Array.isArray(data.sources) ? data.sources : []
                 );
             } catch {
-                this.addMessage('error', 'Could not reach BIIGLEBot backend.');
+                this.addMessage('error', 'Could not reach BIIGLEBot backend.', [], message);
             } finally {
                 this.pending = false;
                 this.focusInput();
             }
+        },
+        retryMessage(errorIndex) {
+            const errorMsg = this.messages[errorIndex];
+            if (!errorMsg || errorMsg.role !== 'error' || !errorMsg.failedUserMessage) {
+                return;
+            }
+
+            const message = errorMsg.failedUserMessage;
+            this.messages.splice(errorIndex, 1);
+            this.doSend(message);
         },
         openModal() {
             this.showModal = true;
