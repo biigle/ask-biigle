@@ -1,6 +1,36 @@
 <template>
-    <div>
-        <modal v-model="showModal" title="BIIGLEBot" size="lg" :footer="false" @shown="focusInput">
+    <div :class="modalWrapperClasses">
+        <modal v-model="showModal" size="lg" :footer="false" @shown="onModalShown">
+            <template #header>
+                <div class="biiglebot-modal-header">
+                    <h4 class="modal-title">BIIGLEBot</h4>
+                    <div class="biiglebot-header-actions">
+                        <button
+                            type="button"
+                            class="biiglebot-header-btn"
+                            :title="maximized ? 'Restore' : 'Maximize'"
+                            @click="toggleMaximize"
+                            >
+                            <i class="fa" :class="maximized ? 'fa-compress' : 'fa-expand'"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="biiglebot-header-btn"
+                            :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+                            @click="toggleFullscreen"
+                            >
+                            <i class="fa" :class="fullscreen ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="close biiglebot-header-close"
+                            @click="closeModal"
+                            >
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
             <div class="biiglebot-chat panel panel-default">
                 <div ref="messages" class="panel-body biiglebot-messages">
                     <p v-if="messages.length === 0" class="text-muted biiglebot-empty">
@@ -238,6 +268,8 @@ export default {
             pending: false,
             messages: [],
             buttonClickHandler: null,
+            maximized: false,
+            fullscreen: false,
         };
     },
     computed: {
@@ -252,6 +284,12 @@ export default {
                     role: message.role,
                     content: message.content,
                 }));
+        },
+        modalWrapperClasses() {
+            return {
+                'biiglebot-maximized': this.maximized,
+                'biiglebot-fullscreen': this.fullscreen,
+            };
         },
     },
     methods: {
@@ -396,6 +434,61 @@ export default {
         openModal() {
             this.showModal = true;
         },
+        closeModal() {
+            if (this.fullscreen) {
+                this.exitFullscreen();
+            }
+            this.showModal = false;
+        },
+        toggleMaximize() {
+            this.maximized = !this.maximized;
+        },
+        toggleFullscreen() {
+            if (this.fullscreen) {
+                this.exitFullscreen();
+            } else {
+                this.enterFullscreen();
+            }
+        },
+        enterFullscreen() {
+            const wrapper = this.$el;
+            const modalEl = wrapper.querySelector('.modal');
+            if (!modalEl) {
+                return;
+            }
+
+            const request = modalEl.requestFullscreen
+                || modalEl.webkitRequestFullscreen
+                || modalEl.msRequestFullscreen;
+
+            if (request) {
+                request.call(modalEl).then(() => {
+                    this.fullscreen = true;
+                }).catch(() => {
+                    // Fullscreen not supported or denied.
+                });
+            }
+        },
+        exitFullscreen() {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                const exit = document.exitFullscreen
+                    || document.webkitExitFullscreen
+                    || document.msExitFullscreen;
+
+                if (exit) {
+                    exit.call(document);
+                }
+            }
+            this.fullscreen = false;
+        },
+        handleFullscreenChange() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                this.fullscreen = false;
+            }
+        },
+        onModalShown() {
+            this.focusInput();
+        },
         insertButton() {
             if (document.getElementById(OPEN_BUTTON_ID)) {
                 return;
@@ -440,11 +533,15 @@ export default {
             this.openModal();
         };
         document.addEventListener('click', this.buttonClickHandler);
+        document.addEventListener('fullscreenchange', this.handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
     beforeUnmount() {
         if (this.buttonClickHandler) {
             document.removeEventListener('click', this.buttonClickHandler);
         }
+        document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
 };
 </script>

@@ -340,3 +340,109 @@
    padding: 0;
    width: 38px;
 }
+
+/* --- Modal header with maximize / fullscreen buttons --- */
+
+.biiglebot-modal-header {
+   align-items: center;
+   display: flex;
+   justify-content: space-between;
+   width: 100%;
+}
+
+.biiglebot-modal-header .modal-title {
+   color: #dfe8f2;
+   font-size: 18px;
+   font-weight: 700;
+   margin: 0;
+}
+
+.biiglebot-header-actions {
+   align-items: center;
+   display: flex;
+   gap: 4px;
+   margin-left: auto;
+}
+
+.biiglebot-header-btn {
+   align-items: center;
+   background: transparent;
+   border: 1px solid transparent;
+   border-radius: 6px;
+   color: #a6b3c1;
+   cursor: pointer;
+   display: inline-flex;
+   font-size: 15px;
+   height: 30px;
+   justify-content: center;
+   outline: none;
+   padding: 0;
+   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+   width: 30px;
+}
+
+.biiglebot-header-btn:hover,
+.biiglebot-header-btn:focus {
+   background: rgba(255, 255, 255, 0.1);
+   border-color: rgba(255, 255, 255, 0.15);
+   color: #e7edf4;
+}
+
+.biiglebot-header-close {
+   font-size: 22px;
+   margin-left: 2px;
+}
+
+/* --- Maximized state --- */
+
+.biiglebot-maximized .modal-dialog {
+   margin: 1.5vh auto;
+   max-width: none;
+   width: 95vw;
+}
+
+.biiglebot-maximized .biiglebot-chat {
+   display: flex;
+   flex-direction: column;
+}
+
+.biiglebot-maximized .biiglebot-messages {
+   flex: 1 1 auto;
+   height: calc(90vh - 200px);
+}
+
+/* --- Fullscreen state --- */
+
+.biiglebot-fullscreen .modal-dialog {
+   height: 100%;
+   margin: 0;
+   max-width: none;
+   width: 100%;
+}
+
+.biiglebot-fullscreen .modal-content {
+   border: 0;
+   border-radius: 0;
+   display: flex;
+   flex-direction: column;
+   height: 100%;
+}
+
+.biiglebot-fullscreen .modal-body {
+   flex: 1 1 auto;
+   overflow: hidden;
+   display: flex;
+   flex-direction: column;
+}
+
+.biiglebot-fullscreen .biiglebot-chat {
+   display: flex;
+   flex: 1 1 auto;
+   flex-direction: column;
+   overflow: hidden;
+}
+
+.biiglebot-fullscreen .biiglebot-messages {
+   flex: 1 1 auto;
+   height: auto;
+}
