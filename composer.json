@@ -12,11 +12,22 @@
       {
          "name": "Martin Zurowietz",
          "email": "m.zurowietz@uni-bielefeld.de"
+      },
+      {
+         "name": "Daniel Langenkämper",
+         "email": "dlangenk@cebitec.uni-bielefeld.de"
       }
     ],
     "autoload": {
       "psr-4": {
          "Biigle\\Modules\\BIIGLEBot\\": "src"
       }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Biigle\\Modules\\BIIGLEBot\\BIIGLEBotServiceProvider"
+            ]
+        }
     }
 }
