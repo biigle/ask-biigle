@@ -67,18 +67,72 @@ class ChatController extends Controller
             $payload['arcana'] = ['id' => $arcanaId];
         }
 
-        $response = Http::acceptJson()
-            ->withToken($apiKey)
-            ->withHeaders([
-                'inference-service' => config('biiglebot.llm_inference_service'),
-            ])
-            ->post($apiUrl, $payload);
+        $maxTries = 3;
+        $timeout = (int) config('biiglebot.llm_timeout', 120);
+        $response = null;
 
-        if (!$response->successful()) {
+        for ($attempt = 1; $attempt <= $maxTries; $attempt++) {
+            try {
+                $response = Http::acceptJson()
+                    ->timeout($timeout)
+                    ->withToken($apiKey)
+                    ->withHeaders([
+                        'inference-service' => config('biiglebot.llm_inference_service'),
+                    ])
+                    ->post($apiUrl, $payload);
+
+                if ($response->successful()) {
+                    break;
+                }
+
+                $details = $response->json();
+                $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
+
+                if ($attempt < $maxTries && ($response->status() >= 500 || $errMsg === 'ReadTimeout')) {
+                    usleep(1000000); // 1s delay before retry
+                    continue;
+                }
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                if ($attempt < $maxTries) {
+                    usleep(1000000);
+                    continue;
+                }
+
+                return response()->json([
+                    'message' => 'The AI service connection timed out. Please click Retry to try again.',
+                    'details' => [
+                        'type' => 'error',
+                        'status' => 504,
+                        'message' => 'ReadTimeout',
+                    ],
+                ], 504);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'BIIGLEBot request failed: '.$e->getMessage(),
+                    'details' => [
+                        'type' => 'error',
+                        'status' => 500,
+                        'message' => $e->getMessage(),
+                    ],
+                ], 500);
+            }
+        }
+
+        if (!$response || !$response->successful()) {
+            $details = $response ? $response->json() : null;
+            $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
+
+            $message = 'BIIGLEBot request failed.';
+            if ($errMsg === 'ReadTimeout') {
+                $message = 'The upstream AI service (AcademicCloud) encountered a timeout. Please click Retry to try again.';
+            } elseif ($errMsg) {
+                $message = 'BIIGLEBot request failed: '.$errMsg;
+            }
+
             return response()->json([
-                'message' => 'BIIGLEBot request failed.',
-                'details' => $response->json(),
-            ], $response->status());
+                'message' => $message,
+                'details' => $details,
+            ], $response ? ($response->status() >= 400 && $response->status() < 600 ? $response->status() : 500) : 500);
         }
 
         $content = data_get($response->json(), 'choices.0.message.content');

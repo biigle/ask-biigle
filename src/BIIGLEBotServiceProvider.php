@@ -30,7 +30,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
         );
 
         $modules->register("BIIGLEBot", [
-            "viewMixins" => ["navbarMenuItem"],
+            "viewMixins" => ["navbarItem"],
             "controllerMixins" => [
                 //
             ],
