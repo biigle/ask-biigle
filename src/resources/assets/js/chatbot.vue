@@ -32,7 +32,12 @@
                 </div>
             </template>
             <div class="biiglebot-chat panel panel-default">
-                <div ref="messages" class="panel-body biiglebot-messages">
+                <div
+                    ref="messages"
+                    class="panel-body biiglebot-messages"
+                    :class="{'biiglebot-messages--shadow-top': showTopShadow, 'biiglebot-messages--shadow-bottom': showBottomShadow}"
+                    @scroll="updateScrollShadows"
+                    >
                     <p v-if="messages.length === 0" class="text-muted biiglebot-empty">
                         Ask BIIGLEBot anything about using BIIGLE.
                     </p>
@@ -48,12 +53,12 @@
                             <button
                                 v-if="message.role === 'error'"
                                 type="button"
-                                class="biiglebot-retry-btn"
+                                class="btn btn-default btn-xs biiglebot-retry-btn"
                                 title="Retry"
                                 :disabled="pending"
                                 @click="retryMessage(index)"
                                 >
-                                <i class="fa fa-refresh"></i> Retry
+                                <i class="fa fa-redo"></i> Retry
                             </button>
                             <div v-if="message.role === 'assistant' && message.sources.length > 0" class="biiglebot-sources">
                                 <div class="biiglebot-source-chips">
@@ -61,7 +66,7 @@
                                         v-for="(source, sourceIndex) in message.sources"
                                         :key="`${index}-chip-${sourceIndex}`"
                                         type="button"
-                                        class="biiglebot-source-chip"
+                                        class="label label-default"
                                         :title="source.title"
                                         @click="openSource(index, source.id)"
                                         >
@@ -70,18 +75,18 @@
                                 </div>
                                 <button
                                     type="button"
-                                    class="btn btn-link btn-xs biiglebot-sources-toggle"
+                                    class="btn btn-link btn-xs"
                                     @click="toggleSources(index)"
                                     >
                                     {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
                                 </button>
-                                <div v-if="message.sourcesExpanded" class="biiglebot-sources-panel">
+                                <div v-if="message.sourcesExpanded" class="list-group biiglebot-sources-panel">
                                     <div
                                         v-for="(source, sourceIndex) in message.sources"
                                         :key="`${index}-source-${sourceIndex}`"
                                         :id="sourceElementId(index, source.id)"
-                                        class="biiglebot-source-item"
-                                        :class="{'biiglebot-source-item--active': message.activeSourceId === source.id}"
+                                        class="list-group-item"
+                                        :class="{'list-group-item-info': message.activeSourceId === source.id}"
                                         >
                                         <div class="biiglebot-source-item__title">
                                             <strong>{{ source.id }}</strong>
@@ -120,11 +125,11 @@
                         @keydown="handleKeyDown"
                         ></textarea>
                     <div class="biiglebot-actions">
-                        <button class="btn btn-default biiglebot-btn-icon" :disabled="pending" title="Clear chat" @click="clearChat">
-                            <i class="fa fa-trash"></i>
+                        <button class="btn btn-default" :disabled="pending" title="Clear chat" @click="clearChat">
+                            Clear conversation
                         </button>
-                        <button class="btn btn-primary biiglebot-btn-icon" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
-                            <i class="fa fa-paper-plane"></i>
+                        <button class="btn btn-success pull-right" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
+                            <i class="fa fa-paper-plane"></i> Send
                         </button>
                     </div>
                 </div>
@@ -270,6 +275,8 @@ export default {
             buttonClickHandler: null,
             maximized: false,
             fullscreen: false,
+            showTopShadow: false,
+            showBottomShadow: false,
         };
     },
     computed: {
@@ -320,7 +327,17 @@ export default {
                 if (this.$refs.messages) {
                     this.$refs.messages.scrollTop = this.$refs.messages.scrollHeight;
                 }
+                this.updateScrollShadows();
             });
+        },
+        updateScrollShadows() {
+            const el = this.$refs.messages;
+            if (!el) {
+                return;
+            }
+
+            this.showTopShadow = el.scrollTop > 0;
+            this.showBottomShadow = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
         },
         addMessage(role, content, sources = [], failedUserMessage = null) {
             this.messages.push({
@@ -339,6 +356,7 @@ export default {
             }
 
             this.messages[index].sourcesExpanded = !this.messages[index].sourcesExpanded;
+            this.$nextTick(() => this.updateScrollShadows());
         },
         sourceElementId(messageIndex, sourceId) {
             const safeId = String(sourceId).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
@@ -369,6 +387,8 @@ export default {
         },
         clearChat() {
             this.messages = [];
+            this.showTopShadow = false;
+            this.showBottomShadow = false;
         },
         handleKeyDown(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -488,6 +508,7 @@ export default {
         },
         onModalShown() {
             this.focusInput();
+            this.updateScrollShadows();
         },
         insertButton() {
             if (document.getElementById(OPEN_BUTTON_ID)) {
