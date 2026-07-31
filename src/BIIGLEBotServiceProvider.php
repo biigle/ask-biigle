@@ -17,7 +17,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
      */
     public function boot(Modules $modules, Router $router)
     {
-        $this->loadViewsFrom(__DIR__ . "/resources/views", "BIIGLEBot");
+        $this->loadViewsFrom(__DIR__ . "/resources/views", "biiglebot");
 
         $router->group(
             [
@@ -29,7 +29,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
             },
         );
 
-        $modules->register("BIIGLEBot", [
+        $modules->register("biiglebot", [
             "viewMixins" => ["navbarMenuItem"],
             "controllerMixins" => [
                 //
@@ -41,7 +41,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
 
         $this->publishes(
             [
-                __DIR__ . "/public" => public_path("vendor/BIIGLEBot"),
+                __DIR__ . "/public" => public_path("vendor/biiglebot"),
             ],
             "public",
         );
