@@ -1,15 +1,15 @@
 {
   "src/resources/assets/js/chatbot.js": {
-    "file": "assets/chatbot-FaLtHzwh.js",
+    "file": "assets/chatbot-CnphpvxL.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.js",
     "isEntry": true,
     "css": [
-      "assets/chatbot-BRv8jUxO.css"
+      "assets/chatbot-DjpckJ8T.css"
     ]
   },
   "src/resources/assets/sass/chatbot.scss": {
-    "file": "assets/chatbot-BRv8jUxO.css",
+    "file": "assets/chatbot-DjpckJ8T.css",
     "name": "chatbot",
     "names": [
       "chatbot.css"
