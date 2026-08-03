@@ -139,10 +139,22 @@
 </template>
 
 <script>
+import { marked } from 'marked';
 import AskBiigleApi from './api/ask-biigle.js';
 
 const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
+
+marked.use({
+    gfm: true,
+    breaks: true,
+    renderer: {
+        link({ href, title, text }) {
+            const titleAttr = title ? ` title="${title}"` : '';
+            return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+        },
+    },
+});
 
 function escapeHtml(value) {
     return value
@@ -153,112 +165,11 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function renderInlineMarkdown(value) {
-    let html = escapeHtml(value);
-    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-    return html;
-}
-
 function renderMarkdown(value) {
-    const lines = value.split('\n');
-    const html = [];
-    let inUnorderedList = false;
-    let inOrderedList = false;
-    let inCodeBlock = false;
-    let codeLanguage = '';
-    let codeLines = [];
-
-    const closeLists = () => {
-        if (inUnorderedList) {
-            html.push('</ul>');
-            inUnorderedList = false;
-        }
-
-        if (inOrderedList) {
-            html.push('</ol>');
-            inOrderedList = false;
-        }
-    };
-
-    const closeCodeBlock = () => {
-        const languageClass = codeLanguage ? ` class="language-${escapeHtml(codeLanguage)}"` : '';
-        const code = escapeHtml(codeLines.join('\n'));
-        html.push(`<pre><code${languageClass}>${code}</code></pre>`);
-        inCodeBlock = false;
-        codeLanguage = '';
-        codeLines = [];
-    };
-
-    lines.forEach((line) => {
-        const fenceMatch = line.match(/^\s*```([^\s`]+)?\s*$/);
-        if (fenceMatch) {
-            if (inCodeBlock) {
-                closeCodeBlock();
-            } else {
-                closeLists();
-                inCodeBlock = true;
-                codeLanguage = fenceMatch[1] || '';
-                codeLines = [];
-            }
-            return;
-        }
-
-        if (inCodeBlock) {
-            codeLines.push(line);
-            return;
-        }
-
-        const headingMatch = line.match(/^\s*(#{1,6})\s*(.+)$/);
-        const unorderedMatch = line.match(/^\s*[-*]\s+(.*)$/);
-        const orderedMatch = line.match(/^\s*\d+\.\s+(.*)$/);
-
-        if (headingMatch) {
-            closeLists();
-            const level = headingMatch[1].length;
-            html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
-            return;
-        }
-
-        if (unorderedMatch) {
-            if (!inUnorderedList) {
-                closeLists();
-                html.push('<ul>');
-                inUnorderedList = true;
-            }
-            html.push(`<li>${renderInlineMarkdown(unorderedMatch[1])}</li>`);
-            return;
-        }
-
-        if (orderedMatch) {
-            if (!inOrderedList) {
-                closeLists();
-                html.push('<ol>');
-                inOrderedList = true;
-            }
-            html.push(`<li>${renderInlineMarkdown(orderedMatch[1])}</li>`);
-            return;
-        }
-
-        closeLists();
-        const trimmed = line.trim();
-        if (!trimmed) {
-            return;
-        }
-
-        html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
-    });
-
-    if (inCodeBlock) {
-        closeCodeBlock();
+    if (!value) {
+        return '';
     }
-
-    closeLists();
-
-    return html.join('');
+    return marked.parse(value);
 }
 
 export default {
@@ -659,12 +570,16 @@ export default {
 
 .ask-biigle-bubble__content {
     color: #dfe8f2;
-    white-space: pre-wrap;
     word-break: break-word;
+
+    p {
+        white-space: pre-wrap;
+        margin-bottom: 8px;
+    }
 
     h1, h2, h3, h4, h5, h6 {
         font-weight: 700;
-        margin: 8px 0 6px;
+        margin: 12px 0 6px;
     }
 
     h1 { font-size: 20px; }
@@ -675,6 +590,8 @@ export default {
     p:last-child,
     ul:last-child,
     ol:last-child,
+    table:last-child,
+    pre:last-child,
     h1:last-child,
     h2:last-child,
     h3:last-child,
@@ -691,6 +608,68 @@ export default {
     a {
         color: #9fd6ff;
         text-decoration: underline;
+    }
+
+    table {
+        width: 100%;
+        max-width: 100%;
+        margin: 10px 0;
+        border-collapse: collapse;
+        border-spacing: 0;
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid #3d4b5a;
+        border-radius: 6px;
+        overflow: hidden;
+        white-space: normal;
+
+        th, td {
+            padding: 8px 12px;
+            border: 1px solid #3d4b5a;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: 700;
+            color: #7fc4ea;
+        }
+
+        tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+    }
+
+    pre {
+        background: #141a21;
+        border: 1px solid #34414f;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+
+        code {
+            background: transparent;
+            color: #7fc4ea;
+            padding: 0;
+            border-radius: 0;
+            font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+            font-size: 12px;
+        }
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.1);
+        color: #7fc4ea;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+        font-size: 85%;
     }
 }
 
