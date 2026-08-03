@@ -24,29 +24,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-
-    - name: Set registry authentication token
-      run: echo "//npm.pkg.github.com/:_authToken=$GITHUB_TOKEN" >> .npmrc
-      env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-    - name: Install dependencies
-      run: npm install
-
-    # Clone core to get access to the variabley stylesheet
+    # Clone core to get access to the variable stylesheet. It must be
+    # checked out at the workspace root so that the ../../../ loadPath
+    # in vite.config.js resolves, mirroring the local vendor/biigle/*
+    # module layout.
     - uses: actions/checkout@v1
       with:
         repository: biigle/core
         ref: master
         fetch-depth: 1
-        path: core
+
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+        path: vendor/biigle/ask-biigle
+
+    - name: Set registry authentication token
+      working-directory: vendor/biigle/ask-biigle
+      run: echo "//npm.pkg.github.com/:_authToken=$GITHUB_TOKEN" >> .npmrc
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+    - name: Install dependencies
+      working-directory: vendor/biigle/ask-biigle
+      run: npm install
 
     # Don't use "npm run build" because it also runs the artisan command
     - name: Run Vite
+      working-directory: vendor/biigle/ask-biigle
       run: npx vite build
 
     - name: Check for uncommitted changes
+      working-directory: vendor/biigle/ask-biigle
       run: '[ -z "$(git status -s --porcelain | grep public)" ]'
