@@ -1,0 +1,947 @@
+<template>
+    <div :class="modalWrapperClasses">
+        <modal v-model="showModal" size="lg" :footer="false" append-to-body @shown="onModalShown">
+            <template #header>
+                <div class="askbiigle-modal-header">
+                    <h4 class="modal-title">askBIIGLE</h4>
+                    <div class="askbiigle-header-actions">
+                        <button
+                            type="button"
+                            class="askbiigle-header-btn"
+                            :title="maximized ? 'Restore' : 'Maximize'"
+                            @click="toggleMaximize"
+                            >
+                            <i class="fa" :class="maximized ? 'fa-compress' : 'fa-expand'"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="askbiigle-header-btn"
+                            :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+                            @click="toggleFullscreen"
+                            >
+                            <i class="fa" :class="fullscreen ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="close askbiigle-header-close"
+                            @click="closeModal"
+                            >
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                </div>
+            </template>
+            <div class="askbiigle-chat panel panel-default">
+                <div
+                    ref="messages"
+                    class="panel-body askbiigle-messages"
+                    :class="{'askbiigle-messages--shadow-top': showTopShadow, 'askbiigle-messages--shadow-bottom': showBottomShadow}"
+                    @scroll="updateScrollShadows"
+                    >
+                    <p v-if="messages.length === 0" class="text-muted askbiigle-empty">
+                        Ask askBIIGLE anything about using BIIGLE.
+                    </p>
+                    <div
+                        v-for="(message, index) in messages"
+                        :key="index"
+                        class="askbiigle-row"
+                        :class="`askbiigle-row--${message.role}`"
+                        >
+                        <div class="askbiigle-bubble">
+                            <div class="askbiigle-bubble__role">{{ roleLabel(message.role) }}</div>
+                            <div class="askbiigle-bubble__content" v-html="renderMessageHtml(message)"></div>
+                            <button
+                                v-if="message.role === 'error'"
+                                type="button"
+                                class="btn btn-default btn-xs askbiigle-retry-btn"
+                                title="Retry"
+                                :disabled="pending"
+                                @click="retryMessage(index)"
+                                >
+                                <i class="fa fa-redo"></i> Retry
+                            </button>
+                            <div v-if="message.role === 'assistant' && message.sources.length > 0" class="askbiigle-sources">
+                                <div class="askbiigle-source-chips">
+                                    <button
+                                        v-for="(source, sourceIndex) in message.sources"
+                                        :key="`${index}-chip-${sourceIndex}`"
+                                        type="button"
+                                        class="label label-default"
+                                        :title="source.title"
+                                        @click="openSource(index, source.id)"
+                                        >
+                                        {{ source.id }}
+                                    </button>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="btn btn-link btn-xs"
+                                    @click="toggleSources(index)"
+                                    >
+                                    {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
+                                </button>
+                                <div v-if="message.sourcesExpanded" class="list-group askbiigle-sources-panel">
+                                    <div
+                                        v-for="(source, sourceIndex) in message.sources"
+                                        :key="`${index}-source-${sourceIndex}`"
+                                        :id="sourceElementId(index, source.id)"
+                                        class="list-group-item"
+                                        :class="{'list-group-item-info': message.activeSourceId === source.id}"
+                                        >
+                                        <div class="askbiigle-source-item__title">
+                                            <strong>{{ source.id }}</strong>
+                                            <span>{{ source.title }}</span>
+                                            <span v-if="source.score !== null" class="askbiigle-source-score">
+                                                {{ source.score.toFixed(3) }}
+                                            </span>
+                                        </div>
+                                        <div v-if="source.snippet" class="askbiigle-source-item__snippet">
+                                            {{ source.snippet }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="pending" class="askbiigle-row askbiigle-row--assistant">
+                        <div class="askbiigle-bubble">
+                            <div class="askbiigle-bubble__role">askBIIGLE</div>
+                            <div class="askbiigle-typing-indicator">
+                                <span class="askbiigle-typing-dot"></span>
+                                <span class="askbiigle-typing-dot"></span>
+                                <span class="askbiigle-typing-dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-footer askbiigle-footer">
+                    <textarea
+                        ref="input"
+                        v-model="input"
+                        class="form-control"
+                        rows="3"
+                        placeholder="Ask askBIIGLE..."
+                        :disabled="pending"
+                        @keydown="handleKeyDown"
+                        ></textarea>
+                    <div class="askbiigle-actions">
+                        <button class="btn btn-default" :disabled="pending" title="Clear chat" @click="clearChat">
+                            Clear conversation
+                        </button>
+                        <button class="btn btn-success pull-right" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
+                            <i class="fa fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </modal>
+    </div>
+</template>
+
+<script>
+import AskBiigleApi from './api/askbiigle.js';
+
+const Modal = biigle.$require('uiv.modal');
+const MAX_HISTORY_ITEMS = 20;
+
+function escapeHtml(value) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderInlineMarkdown(value) {
+    let html = escapeHtml(value);
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    return html;
+}
+
+function renderMarkdown(value) {
+    const lines = value.split('\n');
+    const html = [];
+    let inUnorderedList = false;
+    let inOrderedList = false;
+    let inCodeBlock = false;
+    let codeLanguage = '';
+    let codeLines = [];
+
+    const closeLists = () => {
+        if (inUnorderedList) {
+            html.push('</ul>');
+            inUnorderedList = false;
+        }
+
+        if (inOrderedList) {
+            html.push('</ol>');
+            inOrderedList = false;
+        }
+    };
+
+    const closeCodeBlock = () => {
+        const languageClass = codeLanguage ? ` class="language-${escapeHtml(codeLanguage)}"` : '';
+        const code = escapeHtml(codeLines.join('\n'));
+        html.push(`<pre><code${languageClass}>${code}</code></pre>`);
+        inCodeBlock = false;
+        codeLanguage = '';
+        codeLines = [];
+    };
+
+    lines.forEach((line) => {
+        const fenceMatch = line.match(/^\s*```([^\s`]+)?\s*$/);
+        if (fenceMatch) {
+            if (inCodeBlock) {
+                closeCodeBlock();
+            } else {
+                closeLists();
+                inCodeBlock = true;
+                codeLanguage = fenceMatch[1] || '';
+                codeLines = [];
+            }
+            return;
+        }
+
+        if (inCodeBlock) {
+            codeLines.push(line);
+            return;
+        }
+
+        const headingMatch = line.match(/^\s*(#{1,6})\s*(.+)$/);
+        const unorderedMatch = line.match(/^\s*[-*]\s+(.*)$/);
+        const orderedMatch = line.match(/^\s*\d+\.\s+(.*)$/);
+
+        if (headingMatch) {
+            closeLists();
+            const level = headingMatch[1].length;
+            html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2].trim())}</h${level}>`);
+            return;
+        }
+
+        if (unorderedMatch) {
+            if (!inUnorderedList) {
+                closeLists();
+                html.push('<ul>');
+                inUnorderedList = true;
+            }
+            html.push(`<li>${renderInlineMarkdown(unorderedMatch[1])}</li>`);
+            return;
+        }
+
+        if (orderedMatch) {
+            if (!inOrderedList) {
+                closeLists();
+                html.push('<ol>');
+                inOrderedList = true;
+            }
+            html.push(`<li>${renderInlineMarkdown(orderedMatch[1])}</li>`);
+            return;
+        }
+
+        closeLists();
+        const trimmed = line.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
+    });
+
+    if (inCodeBlock) {
+        closeCodeBlock();
+    }
+
+    closeLists();
+
+    return html.join('');
+}
+
+export default {
+    components: {
+        modal: Modal,
+    },
+    data() {
+        return {
+            showModal: false,
+            input: '',
+            pending: false,
+            messages: [],
+            maximized: false,
+            fullscreen: false,
+            openHandler: null,
+            showTopShadow: false,
+            showBottomShadow: false,
+        };
+    },
+    computed: {
+        canSend() {
+            return this.input.trim().length > 0;
+        },
+        requestHistory() {
+            return this.messages
+                .filter((message) => message.role === 'user' || message.role === 'assistant')
+                .slice(-MAX_HISTORY_ITEMS)
+                .map((message) => ({
+                    role: message.role,
+                    content: message.content,
+                }));
+        },
+        modalWrapperClasses() {
+            return {
+                'askbiigle-maximized': this.maximized,
+                'askbiigle-fullscreen': this.fullscreen,
+            };
+        },
+    },
+    watch: {
+        showModal(show) {
+            try {
+                const Keyboard = biigle.$require('keyboard');
+                if (Keyboard && typeof Keyboard.disable === 'function') {
+                    if (show) {
+                        Keyboard.disable();
+                    } else {
+                        Keyboard.enable();
+                    }
+                }
+            } catch {
+                // Keyboard module not available.
+            }
+        },
+    },
+    methods: {
+        roleLabel(role) {
+            if (role === 'assistant') {
+                return 'askBIIGLE';
+            }
+            if (role === 'user') {
+                return 'You';
+            }
+
+            return 'Error';
+        },
+        focusInput() {
+            this.$nextTick(() => {
+                if (this.$refs.input) {
+                    this.$refs.input.focus();
+                }
+            });
+        },
+        scrollToBottom() {
+            this.$nextTick(() => {
+                if (this.$refs.messages) {
+                    this.$refs.messages.scrollTop = this.$refs.messages.scrollHeight;
+                }
+                this.updateScrollShadows();
+            });
+        },
+        updateScrollShadows() {
+            const el = this.$refs.messages;
+            if (!el) {
+                return;
+            }
+
+            this.showTopShadow = el.scrollTop > 0;
+            this.showBottomShadow = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+        },
+        addMessage(role, content, sources = [], failedUserMessage = null) {
+            this.messages.push({
+                role,
+                content,
+                sources: Array.isArray(sources) ? sources : [],
+                sourcesExpanded: false,
+                activeSourceId: null,
+                failedUserMessage,
+            });
+            this.scrollToBottom();
+        },
+        toggleSources(index) {
+            if (!this.messages[index]) {
+                return;
+            }
+
+            this.messages[index].sourcesExpanded = !this.messages[index].sourcesExpanded;
+            this.$nextTick(() => this.updateScrollShadows());
+        },
+        sourceElementId(messageIndex, sourceId) {
+            const safeId = String(sourceId).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+
+            return `askbiigle-source-${messageIndex}-${safeId}`;
+        },
+        openSource(messageIndex, sourceId) {
+            const message = this.messages[messageIndex];
+            if (!message) {
+                return;
+            }
+
+            message.sourcesExpanded = true;
+            message.activeSourceId = sourceId;
+            this.$nextTick(() => {
+                const target = document.getElementById(this.sourceElementId(messageIndex, sourceId));
+                if (target) {
+                    target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+                }
+            });
+        },
+        renderMessageHtml(message) {
+            if (message.role === 'user') {
+                return `<p>${escapeHtml(message.content)}</p>`;
+            }
+
+            return renderMarkdown(message.content);
+        },
+        clearChat() {
+            this.messages = [];
+            this.showTopShadow = false;
+            this.showBottomShadow = false;
+        },
+        handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                this.sendMessage();
+            }
+        },
+        async sendMessage() {
+            if (this.pending || !this.canSend) {
+                return;
+            }
+
+            const message = this.input.trim();
+            this.input = '';
+            this.addMessage('user', message);
+            await this.doSend(message);
+        },
+        async doSend(message) {
+            this.pending = true;
+
+            try {
+                const response = await AskBiigleApi.save({}, {
+                    message,
+                    history: this.requestHistory,
+                });
+
+                const data = response.body;
+                this.addMessage(
+                    'assistant',
+                    data && data.assistant ? data.assistant : '',
+                    data && Array.isArray(data.sources) ? data.sources : []
+                );
+            } catch (response) {
+                const data = response && response.body;
+                let errorMessage = 'Request failed.';
+                if (data && typeof data.message === 'string' && data.message.length > 0) {
+                    errorMessage = data.message;
+                } else if (response && response.status === 504) {
+                    errorMessage = 'The AI service timed out. Click Retry to try again.';
+                } else if (response && response.status === 500) {
+                    errorMessage = 'askBIIGLE server error. Click Retry to try again.';
+                }
+                this.addMessage('error', errorMessage, [], message);
+            } finally {
+                this.pending = false;
+                this.focusInput();
+            }
+        },
+        retryMessage(errorIndex) {
+            const errorMsg = this.messages[errorIndex];
+            if (!errorMsg || errorMsg.role !== 'error' || !errorMsg.failedUserMessage) {
+                return;
+            }
+
+            const message = errorMsg.failedUserMessage;
+            this.messages.splice(errorIndex, 1);
+            this.doSend(message);
+        },
+        openModal() {
+            this.showModal = true;
+        },
+        closeModal() {
+            if (this.fullscreen) {
+                this.exitFullscreen();
+            }
+            this.showModal = false;
+        },
+        toggleMaximize() {
+            this.maximized = !this.maximized;
+        },
+        toggleFullscreen() {
+            if (this.fullscreen) {
+                this.exitFullscreen();
+            } else {
+                this.enterFullscreen();
+            }
+        },
+        enterFullscreen() {
+            const wrapper = this.$el;
+            const modalEl = wrapper.querySelector('.modal');
+            if (!modalEl) {
+                return;
+            }
+
+            const request = modalEl.requestFullscreen
+                || modalEl.webkitRequestFullscreen
+                || modalEl.msRequestFullscreen;
+
+            if (request) {
+                request.call(modalEl).then(() => {
+                    this.fullscreen = true;
+                }).catch(() => {
+                    // Fullscreen not supported or denied.
+                });
+            }
+        },
+        exitFullscreen() {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                const exit = document.exitFullscreen
+                    || document.webkitExitFullscreen
+                    || document.msExitFullscreen;
+
+                if (exit) {
+                    exit.call(document);
+                }
+            }
+            this.fullscreen = false;
+        },
+        handleFullscreenChange() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                this.fullscreen = false;
+            }
+        },
+        onModalShown() {
+            this.focusInput();
+            this.updateScrollShadows();
+        },
+    },
+    mounted() {
+        this.openHandler = () => this.openModal();
+        window.addEventListener('askbiigle:open', this.openHandler);
+        document.addEventListener('fullscreenchange', this.handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
+    },
+    beforeUnmount() {
+        if (this.openHandler) {
+            window.removeEventListener('askbiigle:open', this.openHandler);
+        }
+        document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
+    },
+};
+</script>
+
+<style lang="scss">
+.askbiigle-chat {
+    margin-bottom: 0;
+}
+
+.askbiigle-messages {
+    background: #1f2731;
+    border: 1px solid #34414f;
+    border-radius: 4px;
+    height: 340px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.askbiigle-empty {
+    color: #c3cfdb;
+    margin: 0;
+    text-align: center;
+}
+
+.askbiigle-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.askbiigle-row--assistant {
+    justify-content: flex-start;
+}
+
+.askbiigle-row--user {
+    justify-content: flex-end;
+}
+
+.askbiigle-row--error {
+    justify-content: center;
+}
+
+.askbiigle-bubble {
+    background: #2b3542;
+    border: 1px solid #415062;
+    border-radius: 14px;
+    max-width: 85%;
+    padding: 10px 12px;
+    position: relative;
+    color: #dfe8f2;
+}
+
+.askbiigle-row--assistant .askbiigle-bubble {
+    background: #233746;
+    border-color: #35566d;
+    box-shadow: inset 0 0 0 1px #2d4a5e;
+}
+
+.askbiigle-row--user .askbiigle-bubble {
+    background: #273b31;
+    border-color: #3f614f;
+    box-shadow: inset 0 0 0 1px #335041;
+}
+
+.askbiigle-row--error .askbiigle-bubble {
+    border-color: #ebccd1;
+    box-shadow: inset 0 0 0 1px #d9534f;
+}
+
+.askbiigle-retry-btn {
+    background: rgba(217, 83, 79, 0.15);
+    border: 1px solid rgba(217, 83, 79, 0.4);
+    border-radius: 999px;
+    color: #e8a09e;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    margin-top: 6px;
+    outline: none;
+    padding: 4px 10px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover,
+    &:focus {
+        background: rgba(217, 83, 79, 0.28);
+        border-color: rgba(217, 83, 79, 0.6);
+        color: #f2c4c3;
+    }
+
+    &:hover .fa-refresh {
+        animation: askbiigle-spin 0.5s ease-in-out;
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+@keyframes askbiigle-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.askbiigle-bubble__role {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.askbiigle-row--assistant .askbiigle-bubble__role {
+    color: #7fc4ea;
+}
+
+.askbiigle-row--user .askbiigle-bubble__role {
+    color: #8bdeb0;
+}
+
+.askbiigle-row--error .askbiigle-bubble__role {
+    color: #a94442;
+}
+
+.askbiigle-bubble__content {
+    color: #dfe8f2;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+        margin: 8px 0 6px;
+    }
+
+    h1 { font-size: 20px; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 16px; }
+    h4, h5, h6 { font-size: 14px; }
+
+    p:last-child,
+    ul:last-child,
+    ol:last-child,
+    h1:last-child,
+    h2:last-child,
+    h3:last-child,
+    h4:last-child,
+    h5:last-child,
+    h6:last-child {
+        margin-bottom: 0;
+    }
+
+    ul, ol {
+        margin: 0 0 10px 20px;
+    }
+
+    a {
+        color: #9fd6ff;
+        text-decoration: underline;
+    }
+}
+
+.askbiigle-sources {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.askbiigle-source-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.askbiigle-source-chip {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    color: #d9e4ef;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    outline: none;
+    padding: 4px 8px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+
+    &:hover,
+    &:focus {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.34);
+    }
+}
+
+.askbiigle-sources-toggle {
+    color: #9fd6ff;
+    padding: 0;
+
+    &:hover,
+    &:focus {
+        color: #c4e7ff;
+        text-decoration: none;
+    }
+}
+
+.askbiigle-sources-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    margin-top: 6px;
+    padding: 8px;
+}
+
+.askbiigle-source-item + .askbiigle-source-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 7px;
+    padding-top: 7px;
+}
+
+.askbiigle-source-item--active {
+    background: rgba(159, 214, 255, 0.12);
+    border-radius: 6px;
+    padding: 6px;
+}
+
+.askbiigle-source-item__title {
+    align-items: baseline;
+    display: flex;
+    gap: 6px;
+}
+
+.askbiigle-source-score {
+    color: #a7b7c7;
+    font-size: 11px;
+    margin-left: auto;
+}
+
+.askbiigle-source-item__snippet {
+    color: #c8d6e4;
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.askbiigle-footer {
+    background: #1f2731;
+    border-top: 1px solid #34414f;
+
+    .form-control {
+        background: #27313d;
+        border-color: #3d4b5a;
+        color: #e7edf4;
+
+        &::placeholder {
+            color: #a6b3c1;
+        }
+    }
+}
+
+.askbiigle-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.askbiigle-typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 2px;
+}
+
+.askbiigle-typing-dot {
+    background: #7fc4ea;
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    opacity: 0.4;
+    width: 8px;
+    animation: askbiigle-bounce 1.4s ease-in-out infinite both;
+
+    &:nth-child(1) { animation-delay: 0s; }
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes askbiigle-bounce {
+    0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.askbiigle-btn-icon {
+    align-items: center;
+    display: inline-flex;
+    font-size: 16px;
+    height: 34px;
+    justify-content: center;
+    padding: 0;
+    width: 38px;
+}
+
+.askbiigle-modal-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+
+    .modal-title {
+        color: #dfe8f2;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+    }
+}
+
+.askbiigle-header-actions {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.askbiigle-header-btn {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #a6b3c1;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 15px;
+    height: 30px;
+    justify-content: center;
+    outline: none;
+    padding: 0;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    width: 30px;
+
+    &:hover,
+    &:focus {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.15);
+        color: #e7edf4;
+    }
+}
+
+.askbiigle-header-close {
+    font-size: 22px;
+    margin-left: 2px;
+}
+
+.askbiigle-maximized {
+    .modal-dialog {
+        margin: 1.5vh auto;
+        max-width: none;
+        width: 95vw;
+    }
+
+    .askbiigle-chat {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .askbiigle-messages {
+        flex: 1 1 auto;
+        height: calc(90vh - 200px);
+    }
+}
+
+.askbiigle-fullscreen {
+    .modal-dialog {
+        height: 100%;
+        margin: 0;
+        max-width: none;
+        width: 100%;
+    }
+
+    .modal-content {
+        border: 0;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .modal-body {
+        flex: 1 1 auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .askbiigle-chat {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .askbiigle-messages {
+        flex: 1 1 auto;
+        height: auto;
+    }
+}
+</style>
