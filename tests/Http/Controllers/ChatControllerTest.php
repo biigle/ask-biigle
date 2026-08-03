@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\Tests\Modules\BIIGLEBot\Http\Controllers;
+namespace Biigle\Tests\Modules\AskBiigle\Http\Controllers;
 
 use Biigle\Tests\UserTest;
 use Illuminate\Support\Facades\Http;
@@ -10,7 +10,7 @@ class ChatControllerTest extends TestCase
 {
     public function testUnauthenticatedRequest()
     {
-        $response = $this->json('POST', 'biiglebot/chat', ['message' => 'Hello']);
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
 
         $this->assertTrue(in_array($response->getStatusCode(), [302, 401]));
     }
@@ -21,15 +21,15 @@ class ChatControllerTest extends TestCase
         $this->be($user);
 
         config([
-            'biiglebot.llm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
-            'biiglebot.llm_api_key' => '',
-            'biiglebot.llm_algorithm' => '',
+            'ask-biiglellm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
+            'ask-biiglellm_api_key' => '',
+            'ask-biiglellm_algorithm' => '',
         ]);
 
-        $this->json('POST', 'biiglebot/chat', ['message' => 'Hello'])
+        $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
             ->assertStatus(422)
             ->assertJsonFragment([
-                'message' => 'BIIGLEBot is not configured. Please set BIIGLEBOT_LLM_API_URL, BIIGLEBOT_LLM_API_KEY and BIIGLEBOT_LLM_ALGORITHM.',
+                'message' => 'AskBiigle is not configured. Please set AskBiigle_LLM_API_URL, AskBiigle_LLM_API_KEY and AskBiigle_LLM_ALGORITHM.',
             ]);
     }
 
@@ -47,7 +47,7 @@ class ChatControllerTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->json('POST', 'biiglebot/chat', [
+        $response = $this->json('POST', 'ask-biigle/chat', [
             'message' => 'Hello',
             'history' => [
                 ['role' => 'assistant', 'content' => 'Previous answer.'],
@@ -76,7 +76,7 @@ class ChatControllerTest extends TestCase
             ], 500),
         ]);
 
-        $this->json('POST', 'biiglebot/chat', ['message' => 'Hello'])
+        $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
             ->assertStatus(500)
             ->assertJsonStructure(['message']);
     }
@@ -95,7 +95,7 @@ class ChatControllerTest extends TestCase
             ];
         }
 
-        $this->json('POST', 'biiglebot/chat', [
+        $this->json('POST', 'ask-biigle/chat', [
             'message' => 'Hello',
             'history' => $history,
         ])->assertStatus(422);
@@ -115,7 +115,7 @@ class ChatControllerTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->json('POST', 'biiglebot/chat', ['message' => 'Hello']);
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
         $response->assertStatus(200);
 
         $assistant = $response->json('assistant');
@@ -130,15 +130,15 @@ class ChatControllerTest extends TestCase
     protected function configureBot()
     {
         config([
-            'biiglebot.llm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
-            'biiglebot.llm_api_key' => 'test-key',
-            'biiglebot.llm_algorithm' => 'test-model',
-            'biiglebot.llm_inference_service' => 'saia-openai-gateway',
-            'biiglebot.llm_arcana_id' => 'arcana-123',
-            'biiglebot.llm_enable_tools' => true,
-            'biiglebot.llm_temperature' => 0.3,
-            'biiglebot.llm_top_p' => 0.9,
-            'biiglebot.llm_system_prompt' => 'You are an assistant.',
+            'ask-biiglellm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
+            'ask-biiglellm_api_key' => 'test-key',
+            'ask-biiglellm_algorithm' => 'test-model',
+            'ask-biiglellm_inference_service' => 'saia-openai-gateway',
+            'ask-biiglellm_arcana_id' => 'arcana-123',
+            'ask-biiglellm_enable_tools' => true,
+            'ask-biiglellm_temperature' => 0.3,
+            'ask-biiglellm_top_p' => 0.9,
+            'ask-biiglellm_system_prompt' => 'You are an assistant.',
         ]);
     }
 }

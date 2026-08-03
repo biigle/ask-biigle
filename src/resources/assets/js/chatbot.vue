@@ -2,12 +2,12 @@
     <div :class="modalWrapperClasses">
         <modal v-model="showModal" size="lg" :footer="false" append-to-body @shown="onModalShown">
             <template #header>
-                <div class="biiglebot-modal-header">
-                    <h4 class="modal-title">BIIGLEBot</h4>
-                    <div class="biiglebot-header-actions">
+                <div class="AskBiigle-modal-header">
+                    <h4 class="modal-title">AskBiigle</h4>
+                    <div class="AskBiigle-header-actions">
                         <button
                             type="button"
-                            class="biiglebot-header-btn"
+                            class="AskBiigle-header-btn"
                             :title="maximized ? 'Restore' : 'Maximize'"
                             @click="toggleMaximize"
                             >
@@ -15,7 +15,7 @@
                         </button>
                         <button
                             type="button"
-                            class="biiglebot-header-btn"
+                            class="AskBiigle-header-btn"
                             :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
                             @click="toggleFullscreen"
                             >
@@ -23,7 +23,7 @@
                         </button>
                         <button
                             type="button"
-                            class="close biiglebot-header-close"
+                            class="close AskBiigle-header-close"
                             @click="closeModal"
                             >
                             <span>&times;</span>
@@ -31,37 +31,37 @@
                     </div>
                 </div>
             </template>
-            <div class="biiglebot-chat panel panel-default">
+            <div class="AskBiigle-chat panel panel-default">
                 <div
                     ref="messages"
-                    class="panel-body biiglebot-messages"
-                    :class="{'biiglebot-messages--shadow-top': showTopShadow, 'biiglebot-messages--shadow-bottom': showBottomShadow}"
+                    class="panel-body AskBiigle-messages"
+                    :class="{'AskBiigle-messages--shadow-top': showTopShadow, 'AskBiigle-messages--shadow-bottom': showBottomShadow}"
                     @scroll="updateScrollShadows"
                     >
-                    <p v-if="messages.length === 0" class="text-muted biiglebot-empty">
-                        Ask BIIGLEBot anything about using BIIGLE.
+                    <p v-if="messages.length === 0" class="text-muted AskBiigle-empty">
+                        Ask AskBiigle anything about using BIIGLE.
                     </p>
                     <div
                         v-for="(message, index) in messages"
                         :key="index"
-                        class="biiglebot-row"
-                        :class="`biiglebot-row--${message.role}`"
+                        class="AskBiigle-row"
+                        :class="`AskBiigle-row--${message.role}`"
                         >
-                        <div class="biiglebot-bubble">
-                            <div class="biiglebot-bubble__role">{{ roleLabel(message.role) }}</div>
-                            <div class="biiglebot-bubble__content" v-html="renderMessageHtml(message)"></div>
+                        <div class="AskBiigle-bubble">
+                            <div class="AskBiigle-bubble__role">{{ roleLabel(message.role) }}</div>
+                            <div class="AskBiigle-bubble__content" v-html="renderMessageHtml(message)"></div>
                             <button
                                 v-if="message.role === 'error'"
                                 type="button"
-                                class="btn btn-default btn-xs biiglebot-retry-btn"
+                                class="btn btn-default btn-xs AskBiigle-retry-btn"
                                 title="Retry"
                                 :disabled="pending"
                                 @click="retryMessage(index)"
                                 >
                                 <i class="fa fa-redo"></i> Retry
                             </button>
-                            <div v-if="message.role === 'assistant' && message.sources.length > 0" class="biiglebot-sources">
-                                <div class="biiglebot-source-chips">
+                            <div v-if="message.role === 'assistant' && message.sources.length > 0" class="AskBiigle-sources">
+                                <div class="AskBiigle-source-chips">
                                     <button
                                         v-for="(source, sourceIndex) in message.sources"
                                         :key="`${index}-chip-${sourceIndex}`"
@@ -80,7 +80,7 @@
                                     >
                                     {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
                                 </button>
-                                <div v-if="message.sourcesExpanded" class="list-group biiglebot-sources-panel">
+                                <div v-if="message.sourcesExpanded" class="list-group AskBiigle-sources-panel">
                                     <div
                                         v-for="(source, sourceIndex) in message.sources"
                                         :key="`${index}-source-${sourceIndex}`"
@@ -88,14 +88,14 @@
                                         class="list-group-item"
                                         :class="{'list-group-item-info': message.activeSourceId === source.id}"
                                         >
-                                        <div class="biiglebot-source-item__title">
+                                        <div class="AskBiigle-source-item__title">
                                             <strong>{{ source.id }}</strong>
                                             <span>{{ source.title }}</span>
-                                            <span v-if="source.score !== null" class="biiglebot-source-score">
+                                            <span v-if="source.score !== null" class="AskBiigle-source-score">
                                                 {{ source.score.toFixed(3) }}
                                             </span>
                                         </div>
-                                        <div v-if="source.snippet" class="biiglebot-source-item__snippet">
+                                        <div v-if="source.snippet" class="AskBiigle-source-item__snippet">
                                             {{ source.snippet }}
                                         </div>
                                     </div>
@@ -103,28 +103,28 @@
                             </div>
                         </div>
                     </div>
-                    <div v-if="pending" class="biiglebot-row biiglebot-row--assistant">
-                        <div class="biiglebot-bubble">
-                            <div class="biiglebot-bubble__role">BIIGLEBot</div>
-                            <div class="biiglebot-typing-indicator">
-                                <span class="biiglebot-typing-dot"></span>
-                                <span class="biiglebot-typing-dot"></span>
-                                <span class="biiglebot-typing-dot"></span>
+                    <div v-if="pending" class="AskBiigle-row AskBiigle-row--assistant">
+                        <div class="AskBiigle-bubble">
+                            <div class="AskBiigle-bubble__role">AskBiigle</div>
+                            <div class="AskBiigle-typing-indicator">
+                                <span class="AskBiigle-typing-dot"></span>
+                                <span class="AskBiigle-typing-dot"></span>
+                                <span class="AskBiigle-typing-dot"></span>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="panel-footer biiglebot-footer">
+                <div class="panel-footer AskBiigle-footer">
                     <textarea
                         ref="input"
                         v-model="input"
                         class="form-control"
                         rows="3"
-                        placeholder="Ask BIIGLEBot..."
+                        placeholder="Ask AskBiigle..."
                         :disabled="pending"
                         @keydown="handleKeyDown"
                         ></textarea>
-                    <div class="biiglebot-actions">
+                    <div class="AskBiigle-actions">
                         <button class="btn btn-default" :disabled="pending" title="Clear chat" @click="clearChat">
                             Clear conversation
                         </button>
@@ -139,7 +139,7 @@
 </template>
 
 <script>
-import BiiglebotApi from './api/biiglebot.js';
+import AskBiigleApi from './api/ask-biigle.js';
 
 const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
@@ -293,8 +293,8 @@ export default {
         },
         modalWrapperClasses() {
             return {
-                'biiglebot-maximized': this.maximized,
-                'biiglebot-fullscreen': this.fullscreen,
+                'AskBiigle-maximized': this.maximized,
+                'AskBiigle-fullscreen': this.fullscreen,
             };
         },
     },
@@ -317,7 +317,7 @@ export default {
     methods: {
         roleLabel(role) {
             if (role === 'assistant') {
-                return 'BIIGLEBot';
+                return 'AskBiigle';
             }
             if (role === 'user') {
                 return 'You';
@@ -371,7 +371,7 @@ export default {
         sourceElementId(messageIndex, sourceId) {
             const safeId = String(sourceId).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
 
-            return `biiglebot-source-${messageIndex}-${safeId}`;
+            return `AskBiigle-source-${messageIndex}-${safeId}`;
         },
         openSource(messageIndex, sourceId) {
             const message = this.messages[messageIndex];
@@ -420,7 +420,7 @@ export default {
             this.pending = true;
 
             try {
-                const response = await BiiglebotApi.save({}, {
+                const response = await AskBiigleApi.save({}, {
                     message,
                     history: this.requestHistory,
                 });
@@ -439,7 +439,7 @@ export default {
                 } else if (response && response.status === 504) {
                     errorMessage = 'The AI service timed out. Click Retry to try again.';
                 } else if (response && response.status === 500) {
-                    errorMessage = 'BIIGLEBot server error. Click Retry to try again.';
+                    errorMessage = 'AskBiigle server error. Click Retry to try again.';
                 }
                 this.addMessage('error', errorMessage, [], message);
             } finally {
@@ -519,13 +519,13 @@ export default {
     },
     mounted() {
         this.openHandler = () => this.openModal();
-        window.addEventListener('biiglebot:open', this.openHandler);
+        window.addEventListener('AskBiigle:open', this.openHandler);
         document.addEventListener('fullscreenchange', this.handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
     beforeUnmount() {
         if (this.openHandler) {
-            window.removeEventListener('biiglebot:open', this.openHandler);
+            window.removeEventListener('AskBiigle:open', this.openHandler);
         }
         document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
         document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
@@ -534,11 +534,11 @@ export default {
 </script>
 
 <style lang="scss">
-.biiglebot-chat {
+.AskBiigle-chat {
     margin-bottom: 0;
 }
 
-.biiglebot-messages {
+.AskBiigle-messages {
     background: #1f2731;
     border: 1px solid #34414f;
     border-radius: 4px;
@@ -547,30 +547,30 @@ export default {
     padding: 12px;
 }
 
-.biiglebot-empty {
+.AskBiigle-empty {
     color: #c3cfdb;
     margin: 0;
     text-align: center;
 }
 
-.biiglebot-row {
+.AskBiigle-row {
     display: flex;
     margin-bottom: 10px;
 }
 
-.biiglebot-row--assistant {
+.AskBiigle-row--assistant {
     justify-content: flex-start;
 }
 
-.biiglebot-row--user {
+.AskBiigle-row--user {
     justify-content: flex-end;
 }
 
-.biiglebot-row--error {
+.AskBiigle-row--error {
     justify-content: center;
 }
 
-.biiglebot-bubble {
+.AskBiigle-bubble {
     background: #2b3542;
     border: 1px solid #415062;
     border-radius: 14px;
@@ -580,24 +580,24 @@ export default {
     color: #dfe8f2;
 }
 
-.biiglebot-row--assistant .biiglebot-bubble {
+.AskBiigle-row--assistant .AskBiigle-bubble {
     background: #233746;
     border-color: #35566d;
     box-shadow: inset 0 0 0 1px #2d4a5e;
 }
 
-.biiglebot-row--user .biiglebot-bubble {
+.AskBiigle-row--user .AskBiigle-bubble {
     background: #273b31;
     border-color: #3f614f;
     box-shadow: inset 0 0 0 1px #335041;
 }
 
-.biiglebot-row--error .biiglebot-bubble {
+.AskBiigle-row--error .AskBiigle-bubble {
     border-color: #ebccd1;
     box-shadow: inset 0 0 0 1px #d9534f;
 }
 
-.biiglebot-retry-btn {
+.AskBiigle-retry-btn {
     background: rgba(217, 83, 79, 0.15);
     border: 1px solid rgba(217, 83, 79, 0.4);
     border-radius: 999px;
@@ -622,7 +622,7 @@ export default {
     }
 
     &:hover .fa-refresh {
-        animation: biiglebot-spin 0.5s ease-in-out;
+        animation: AskBiigle-spin 0.5s ease-in-out;
     }
 
     &:disabled {
@@ -631,7 +631,7 @@ export default {
     }
 }
 
-@keyframes biiglebot-spin {
+@keyframes AskBiigle-spin {
     from {
         transform: rotate(0deg);
     }
@@ -640,24 +640,24 @@ export default {
     }
 }
 
-.biiglebot-bubble__role {
+.AskBiigle-bubble__role {
     font-weight: 700;
     margin-bottom: 4px;
 }
 
-.biiglebot-row--assistant .biiglebot-bubble__role {
+.AskBiigle-row--assistant .AskBiigle-bubble__role {
     color: #7fc4ea;
 }
 
-.biiglebot-row--user .biiglebot-bubble__role {
+.AskBiigle-row--user .AskBiigle-bubble__role {
     color: #8bdeb0;
 }
 
-.biiglebot-row--error .biiglebot-bubble__role {
+.AskBiigle-row--error .AskBiigle-bubble__role {
     color: #a94442;
 }
 
-.biiglebot-bubble__content {
+.AskBiigle-bubble__content {
     color: #dfe8f2;
     white-space: pre-wrap;
     word-break: break-word;
@@ -694,20 +694,20 @@ export default {
     }
 }
 
-.biiglebot-sources {
+.AskBiigle-sources {
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     margin-top: 8px;
     padding-top: 8px;
 }
 
-.biiglebot-source-chips {
+.AskBiigle-source-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 4px;
 }
 
-.biiglebot-source-chip {
+.AskBiigle-source-chip {
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 999px;
@@ -728,7 +728,7 @@ export default {
     }
 }
 
-.biiglebot-sources-toggle {
+.AskBiigle-sources-toggle {
     color: #9fd6ff;
     padding: 0;
 
@@ -739,7 +739,7 @@ export default {
     }
 }
 
-.biiglebot-sources-panel {
+.AskBiigle-sources-panel {
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 8px;
@@ -747,37 +747,37 @@ export default {
     padding: 8px;
 }
 
-.biiglebot-source-item + .biiglebot-source-item {
+.AskBiigle-source-item + .AskBiigle-source-item {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     margin-top: 7px;
     padding-top: 7px;
 }
 
-.biiglebot-source-item--active {
+.AskBiigle-source-item--active {
     background: rgba(159, 214, 255, 0.12);
     border-radius: 6px;
     padding: 6px;
 }
 
-.biiglebot-source-item__title {
+.AskBiigle-source-item__title {
     align-items: baseline;
     display: flex;
     gap: 6px;
 }
 
-.biiglebot-source-score {
+.AskBiigle-source-score {
     color: #a7b7c7;
     font-size: 11px;
     margin-left: auto;
 }
 
-.biiglebot-source-item__snippet {
+.AskBiigle-source-item__snippet {
     color: #c8d6e4;
     font-size: 12px;
     margin-top: 3px;
 }
 
-.biiglebot-footer {
+.AskBiigle-footer {
     background: #1f2731;
     border-top: 1px solid #34414f;
 
@@ -792,35 +792,35 @@ export default {
     }
 }
 
-.biiglebot-actions {
+.AskBiigle-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
     margin-top: 10px;
 }
 
-.biiglebot-typing-indicator {
+.AskBiigle-typing-indicator {
     display: flex;
     align-items: center;
     gap: 5px;
     padding: 4px 2px;
 }
 
-.biiglebot-typing-dot {
+.AskBiigle-typing-dot {
     background: #7fc4ea;
     border-radius: 50%;
     display: inline-block;
     height: 8px;
     opacity: 0.4;
     width: 8px;
-    animation: biiglebot-bounce 1.4s ease-in-out infinite both;
+    animation: AskBiigle-bounce 1.4s ease-in-out infinite both;
 
     &:nth-child(1) { animation-delay: 0s; }
     &:nth-child(2) { animation-delay: 0.2s; }
     &:nth-child(3) { animation-delay: 0.4s; }
 }
 
-@keyframes biiglebot-bounce {
+@keyframes AskBiigle-bounce {
     0%, 80%, 100% {
         transform: scale(0.6);
         opacity: 0.4;
@@ -831,7 +831,7 @@ export default {
     }
 }
 
-.biiglebot-btn-icon {
+.AskBiigle-btn-icon {
     align-items: center;
     display: inline-flex;
     font-size: 16px;
@@ -841,7 +841,7 @@ export default {
     width: 38px;
 }
 
-.biiglebot-modal-header {
+.AskBiigle-modal-header {
     align-items: center;
     display: flex;
     justify-content: space-between;
@@ -855,14 +855,14 @@ export default {
     }
 }
 
-.biiglebot-header-actions {
+.AskBiigle-header-actions {
     align-items: center;
     display: flex;
     gap: 4px;
     margin-left: auto;
 }
 
-.biiglebot-header-btn {
+.AskBiigle-header-btn {
     align-items: center;
     background: transparent;
     border: 1px solid transparent;
@@ -886,30 +886,30 @@ export default {
     }
 }
 
-.biiglebot-header-close {
+.AskBiigle-header-close {
     font-size: 22px;
     margin-left: 2px;
 }
 
-.biiglebot-maximized {
+.AskBiigle-maximized {
     .modal-dialog {
         margin: 1.5vh auto;
         max-width: none;
         width: 95vw;
     }
 
-    .biiglebot-chat {
+    .AskBiigle-chat {
         display: flex;
         flex-direction: column;
     }
 
-    .biiglebot-messages {
+    .AskBiigle-messages {
         flex: 1 1 auto;
         height: calc(90vh - 200px);
     }
 }
 
-.biiglebot-fullscreen {
+.AskBiigle-fullscreen {
     .modal-dialog {
         height: 100%;
         margin: 0;
@@ -932,14 +932,14 @@ export default {
         flex-direction: column;
     }
 
-    .biiglebot-chat {
+    .AskBiigle-chat {
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
         overflow: hidden;
     }
 
-    .biiglebot-messages {
+    .AskBiigle-messages {
         flex: 1 1 auto;
         height: auto;
     }

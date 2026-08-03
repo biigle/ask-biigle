@@ -1,7 +1,7 @@
 <?php
 
-$router->post('biiglebot/chat', [
+$router->post('ask-biigle/chat', [
    'middleware' => 'auth',
-   'as' => 'biiglebot.chat',
+   'as' => 'ask-biigle.chat',
    'uses' => 'ChatController@chat',
 ]);

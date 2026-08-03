@@ -1,6 +1,6 @@
 <?php
 
-namespace Biigle\Modules\BIIGLEBot\Http\Controllers;
+namespace Biigle\Modules\AskBiigle\Http\Controllers;
 
 use Biigle\Http\Controllers\Views\Controller;
 use Illuminate\Http\Request;
@@ -26,19 +26,19 @@ class ChatController extends Controller
             'history.*.content' => 'required_with:history|string',
         ]);
 
-        $apiKey = config('biiglebot.llm_api_key');
-        $model = config('biiglebot.llm_algorithm');
-        $apiUrl = config('biiglebot.llm_api_url');
+        $apiKey = config('ask-biigle.llm_api_key');
+        $model = config('ask-biigle.llm_algorithm');
+        $apiUrl = config('ask-biigle.llm_api_url');
         if (empty($apiKey) || empty($model) || empty($apiUrl)) {
             throw ValidationException::withMessages([
-                'message' => ['BIIGLEBot is not configured. Please set BIIGLEBOT_LLM_API_URL, BIIGLEBOT_LLM_API_KEY and BIIGLEBOT_LLM_ALGORITHM.'],
+                'message' => ['AskBiigle is not configured. Please set ASK_BIIGLE_LLM_API_URL, ASK_BIIGLE_LLM_API_KEY and ASK_BIIGLE_LLM_ALGORITHM.'],
             ]);
         }
 
         $messages = [
             [
                 'role' => 'system',
-                'content' => trim(config('biiglebot.llm_system_prompt')."\n\nUse Markdown for formatting. Do not output retrieval references, source dumps, or markers like [RREF1]."),
+                'content' => trim(config('ask-biigle.llm_system_prompt')."\n\nUse Markdown for formatting. Do not output retrieval references, source dumps, or markers like [RREF1]."),
             ],
         ];
 
@@ -57,18 +57,18 @@ class ChatController extends Controller
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'enable-tools' => (bool) config('biiglebot.llm_enable_tools'),
-            'temperature' => (float) config('biiglebot.llm_temperature'),
-            'top_p' => (float) config('biiglebot.llm_top_p'),
+            'enable-tools' => (bool) config('ask-biigle.llm_enable_tools'),
+            'temperature' => (float) config('ask-biigle.llm_temperature'),
+            'top_p' => (float) config('ask-biigle.llm_top_p'),
         ];
 
-        $arcanaId = config('biiglebot.llm_arcana_id');
+        $arcanaId = config('ask-biigle.llm_arcana_id');
         if (!empty($arcanaId)) {
             $payload['arcana'] = ['id' => $arcanaId];
         }
 
         $maxTries = 3;
-        $timeout = (int) config('biiglebot.llm_timeout', 120);
+        $timeout = (int) config('ask-biigle.llm_timeout', 120);
         $response = null;
 
         for ($attempt = 1; $attempt <= $maxTries; $attempt++) {
@@ -77,7 +77,7 @@ class ChatController extends Controller
                     ->timeout($timeout)
                     ->withToken($apiKey)
                     ->withHeaders([
-                        'inference-service' => config('biiglebot.llm_inference_service'),
+                        'inference-service' => config('ask-biigle.llm_inference_service'),
                     ])
                     ->post($apiUrl, $payload);
 
@@ -108,7 +108,7 @@ class ChatController extends Controller
                 ], 504);
             } catch (\Throwable $e) {
                 return response()->json([
-                    'message' => 'BIIGLEBot request failed: '.$e->getMessage(),
+                    'message' => 'AskBiigle request failed: '.$e->getMessage(),
                     'details' => [
                         'type' => 'error',
                         'status' => 500,
@@ -122,11 +122,11 @@ class ChatController extends Controller
             $details = $response ? $response->json() : null;
             $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
 
-            $message = 'BIIGLEBot request failed.';
+            $message = 'AskBiigle request failed.';
             if ($errMsg === 'ReadTimeout') {
                 $message = 'The upstream AI service (AcademicCloud) encountered a timeout. Please click Retry to try again.';
             } elseif ($errMsg) {
-                $message = 'BIIGLEBot request failed: '.$errMsg;
+                $message = 'AskBiigle request failed: '.$errMsg;
             }
 
             return response()->json([

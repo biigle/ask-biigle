@@ -1,10 +1,10 @@
 {
-  "name": "biigle-module",
+  "name": "ask-biigle",
   "version": "0.0.1",
   "license": "GPL-3.0-only",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && php ../../../artisan vendor:publish --provider Biigle\\\\Modules\\\\BIIGLEBot\\\\BIIGLEBotServiceProvider --tag public --force",
+    "build": "vite build && php ../../../artisan vendor:publish --provider Biigle\\\\Modules\\\\AskBiigle\\\\AskBiigleServiceProvider --tag public --force",
     "lint": "eslint src/resources/assets/js/"
   },
   "devDependencies": {

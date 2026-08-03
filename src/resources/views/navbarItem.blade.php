@@ -1,14 +1,14 @@
 <li>
-    <a href="#" onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('biiglebot:open'));" title="BIIGLEBot" class="navbar-btn-link">
+    <a href="#" onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('AskBiigle:open'));" title="Ask BIIGLE" class="navbar-btn-link">
         <span class="btn btn-default">
             <i class="fa fa-comments"></i>
         </span>
     </a>
-    <div id="biiglebot-chatbot-container"></div>
+    <div id="ask-biigle-container"></div>
 </li>
 
 @once
     @push('scripts')
-        {{vite_hot(base_path('vendor/biigle/biiglebot/hot'), ['src/resources/assets/js/chatbot.js'], 'vendor/BIIGLEBot')}}
+        {{vite_hot(base_path('vendor/biigle/ask-biigle/hot'), ['src/resources/assets/js/chatbot.js'], 'vendor/ask-biigle')}}
     @endpush
 @endonce
