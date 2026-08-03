@@ -21,9 +21,9 @@ class ChatControllerTest extends TestCase
         $this->be($user);
 
         config([
-            'ask-biiglellm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
-            'ask-biiglellm_api_key' => '',
-            'ask-biiglellm_algorithm' => '',
+            'ask-biigle.llm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
+            'ask-biigle.llm_api_key' => '',
+            'ask-biigle.llm_algorithm' => '',
         ]);
 
         $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
@@ -130,15 +130,15 @@ class ChatControllerTest extends TestCase
     protected function configureBot()
     {
         config([
-            'ask-biiglellm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
-            'ask-biiglellm_api_key' => 'test-key',
-            'ask-biiglellm_algorithm' => 'test-model',
-            'ask-biiglellm_inference_service' => 'saia-openai-gateway',
-            'ask-biiglellm_arcana_id' => 'arcana-123',
-            'ask-biiglellm_enable_tools' => true,
-            'ask-biiglellm_temperature' => 0.3,
-            'ask-biiglellm_top_p' => 0.9,
-            'ask-biiglellm_system_prompt' => 'You are an assistant.',
+            'ask-biigle.llm_api_url' => 'https://chat-ai.academiccloud.de/v1/chat/completions',
+            'ask-biigle.llm_api_key' => 'test-key',
+            'ask-biigle.llm_algorithm' => 'test-model',
+            'ask-biigle.llm_inference_service' => 'saia-openai-gateway',
+            'ask-biigle.llm_arcana_id' => 'arcana-123',
+            'ask-biigle.llm_enable_tools' => true,
+            'ask-biigle.llm_temperature' => 0.3,
+            'ask-biigle.llm_top_p' => 0.9,
+            'ask-biigle.llm_system_prompt' => 'You are an assistant.',
         ]);
     }
 }
