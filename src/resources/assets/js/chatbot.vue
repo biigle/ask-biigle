@@ -1,131 +1,127 @@
 <template>
-    <div>
-        <modal
-            v-model="showModal"
-            size="lg"
-            :footer="false"
-            append-to-body
-            @shown="onModalShown"
-            >
-            <template #header>
-                <div class="ask-biigle-modal-header">
-                    <h4 class="modal-title">Ask BIIGLE</h4>
-                    <div class="ask-biigle-header-actions">
-                        <button
-                            type="button"
-                            class="close ask-biigle-header-close"
-                            @click="closeModal"
-                            >
-                            <span>&times;</span>
-                        </button>
-                    </div>
-                </div>
-            </template>
-            <div class="ask-biigle-chat panel panel-default">
-                <div
-                    ref="messages"
-                    class="panel-body ask-biigle-messages"
-                    :class="{'ask-biigle-messages--shadow-top': showTopShadow, 'ask-biigle-messages--shadow-bottom': showBottomShadow}"
-                    @scroll="updateScrollShadows"
+    <modal
+        v-model="showModal"
+        size="lg"
+        :footer="false"
+        append-to-body
+        @shown="onModalShown"
+        >
+        <template #header>
+            <div class="ask-biigle-modal-header">
+                <h4 class="modal-title">Ask BIIGLE</h4>
+                <button
+                    type="button"
+                    class="close ask-biigle-header-close"
+                    @click="closeModal"
                     >
-                    <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
-                        Ask anything about using BIIGLE.
-                    </p>
-                    <div
-                        v-for="(message, index) in messages"
-                        :key="index"
-                        class="ask-biigle-row"
-                        :class="`ask-biigle-row--${message.role}`"
-                        >
-                        <div class="ask-biigle-bubble">
-                            <div class="ask-biigle-bubble__role">{{ roleLabel(message.role) }}</div>
-                            <div class="ask-biigle-bubble__content" v-html="renderMessageHtml(message)"></div>
-                            <button
-                                v-if="message.role === 'error'"
-                                type="button"
-                                class="btn btn-default btn-xs ask-biigle-retry-btn"
-                                title="Retry"
-                                :disabled="pending"
-                                @click="retryMessage(index)"
-                                >
-                                <i class="fa fa-redo"></i> Retry
-                            </button>
-                            <div v-if="message.role === 'assistant' && message.sources.length > 0" class="ask-biigle-sources">
-                                <div class="ask-biigle-source-chips">
-                                    <button
-                                        v-for="(source, sourceIndex) in message.sources"
-                                        :key="`${index}-chip-${sourceIndex}`"
-                                        type="button"
-                                        class="label label-default"
-                                        :title="source.title"
-                                        @click="openSource(index, source.id)"
-                                        >
-                                        {{ source.id }}
-                                    </button>
-                                </div>
+                    <span>&times;</span>
+                </button>
+            </div>
+        </template>
+        <div class="ask-biigle-chat panel panel-default">
+            <div
+                ref="messages"
+                class="panel-body ask-biigle-messages"
+                :class="{'ask-biigle-messages--shadow-top': showTopShadow, 'ask-biigle-messages--shadow-bottom': showBottomShadow}"
+                @scroll="updateScrollShadows"
+                >
+                <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
+                    Ask anything about using BIIGLE.
+                </p>
+                <div
+                    v-for="(message, index) in messages"
+                    :key="index"
+                    class="ask-biigle-row"
+                    :class="`ask-biigle-row--${message.role}`"
+                    >
+                    <div class="ask-biigle-bubble">
+                        <div class="ask-biigle-bubble__role">{{ roleLabel(message.role) }}</div>
+                        <div class="ask-biigle-bubble__content" v-html="renderMessageHtml(message)"></div>
+                        <button
+                            v-if="message.role === 'error'"
+                            type="button"
+                            class="btn btn-default btn-xs ask-biigle-retry-btn"
+                            title="Retry"
+                            :disabled="pending"
+                            @click="retryMessage(index)"
+                            >
+                            <i class="fa fa-redo"></i> Retry
+                        </button>
+                        <div v-if="message.role === 'assistant' && message.sources.length > 0" class="ask-biigle-sources">
+                            <div class="ask-biigle-source-chips">
                                 <button
+                                    v-for="(source, sourceIndex) in message.sources"
+                                    :key="`${index}-chip-${sourceIndex}`"
                                     type="button"
-                                    class="btn btn-link btn-xs"
-                                    @click="toggleSources(index)"
+                                    class="label label-default"
+                                    :title="source.title"
+                                    @click="openSource(index, source.id)"
                                     >
-                                    {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
+                                    {{ source.id }}
                                 </button>
-                                <div v-if="message.sourcesExpanded" class="list-group ask-biigle-sources-panel">
-                                    <div
-                                        v-for="(source, sourceIndex) in message.sources"
-                                        :key="`${index}-source-${sourceIndex}`"
-                                        :id="sourceElementId(index, source.id)"
-                                        class="list-group-item"
-                                        :class="{'list-group-item-info': message.activeSourceId === source.id}"
-                                        >
-                                        <div class="ask-biigle-source-item__title">
-                                            <strong>{{ source.id }}</strong>
-                                            <span>{{ source.title }}</span>
-                                            <span v-if="source.score !== null" class="ask-biigle-source-score">
-                                                {{ source.score.toFixed(3) }}
-                                            </span>
-                                        </div>
-                                        <div v-if="source.snippet" class="ask-biigle-source-item__snippet">
-                                            {{ source.snippet }}
-                                        </div>
+                            </div>
+                            <button
+                                type="button"
+                                class="btn btn-link btn-xs"
+                                @click="toggleSources(index)"
+                                >
+                                {{ message.sourcesExpanded ? 'Hide sources' : `Show sources (${message.sources.length})` }}
+                            </button>
+                            <div v-if="message.sourcesExpanded" class="list-group ask-biigle-sources-panel">
+                                <div
+                                    v-for="(source, sourceIndex) in message.sources"
+                                    :key="`${index}-source-${sourceIndex}`"
+                                    :id="sourceElementId(index, source.id)"
+                                    class="list-group-item"
+                                    :class="{'list-group-item-info': message.activeSourceId === source.id}"
+                                    >
+                                    <div class="ask-biigle-source-item__title">
+                                        <strong>{{ source.id }}</strong>
+                                        <span>{{ source.title }}</span>
+                                        <span v-if="source.score !== null" class="ask-biigle-source-score">
+                                            {{ source.score.toFixed(3) }}
+                                        </span>
+                                    </div>
+                                    <div v-if="source.snippet" class="ask-biigle-source-item__snippet">
+                                        {{ source.snippet }}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div v-if="pending" class="ask-biigle-row ask-biigle-row--assistant">
-                        <div class="ask-biigle-bubble">
-                            <div class="ask-biigle-bubble__role">BIIGLE</div>
-                            <div class="ask-biigle-typing-indicator">
-                                <span class="ask-biigle-typing-dot"></span>
-                                <span class="ask-biigle-typing-dot"></span>
-                                <span class="ask-biigle-typing-dot"></span>
-                            </div>
+                </div>
+                <div v-if="pending" class="ask-biigle-row ask-biigle-row--assistant">
+                    <div class="ask-biigle-bubble">
+                        <div class="ask-biigle-bubble__role">BIIGLE</div>
+                        <div class="ask-biigle-typing-indicator">
+                            <span class="ask-biigle-typing-dot"></span>
+                            <span class="ask-biigle-typing-dot"></span>
+                            <span class="ask-biigle-typing-dot"></span>
                         </div>
                     </div>
                 </div>
-                <div class="panel-footer ask-biigle-footer">
-                    <textarea
-                        ref="input"
-                        v-model="input"
-                        class="form-control"
-                        rows="3"
-                        placeholder="Ask BIIGLE..."
-                        :disabled="pending"
-                        @keydown="handleKeyDown"
-                        ></textarea>
-                    <div class="ask-biigle-actions">
-                        <button class="btn btn-default" :disabled="pending" title="Clear chat" @click="clearChat">
-                            Clear conversation
-                        </button>
-                        <button class="btn btn-success pull-right" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
-                            <i class="fa fa-paper-plane"></i> Send
-                        </button>
-                    </div>
+            </div>
+            <div class="panel-footer ask-biigle-footer">
+                <textarea
+                    ref="input"
+                    v-model="input"
+                    class="form-control"
+                    rows="3"
+                    placeholder="Ask BIIGLE..."
+                    :disabled="pending"
+                    @keydown="handleKeyDown"
+                    ></textarea>
+                <div class="ask-biigle-actions">
+                    <button class="btn btn-default" :disabled="pending" title="Clear chat" @click="clearChat">
+                        Clear conversation
+                    </button>
+                    <button class="btn btn-success pull-right" :disabled="pending || !canSend" title="Send message" @click="sendMessage">
+                        <i class="fa fa-paper-plane"></i> Send
+                    </button>
                 </div>
             </div>
-        </modal>
-    </div>
+        </div>
+    </modal>
 </template>
 
 <script>
@@ -647,15 +643,7 @@ export default {
     margin: 0;
 }
 
-.ask-biigle-header-actions {
-    align-items: center;
-    display: flex;
-    gap: 4px;
-    margin-left: auto;
-}
-
 .ask-biigle-header-close {
     font-size: 22px;
-    margin-left: 2px;
 }
 </style>
