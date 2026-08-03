@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MODULE_NAME: BIIGLEBot
+      MODULE_NAME: biiglebot
 
     steps:
     - uses: actions/checkout@v1
