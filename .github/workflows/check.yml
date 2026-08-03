@@ -28,13 +28,13 @@ jobs:
     # checked out at the workspace root so that the ../../../ loadPath
     # in vite.config.js resolves, mirroring the local vendor/biigle/*
     # module layout.
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
         repository: biigle/core
         ref: master
         fetch-depth: 1
 
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 1
         path: vendor/biigle/ask-biigle
