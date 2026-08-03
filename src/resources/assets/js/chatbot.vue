@@ -1,6 +1,6 @@
 <template>
     <div :class="modalWrapperClasses">
-        <modal v-model="showModal" size="lg" :footer="false" @shown="onModalShown">
+        <modal v-model="showModal" size="lg" :footer="false" append-to-body @shown="onModalShown">
             <template #header>
                 <div class="biiglebot-modal-header">
                     <h4 class="modal-title">BIIGLEBot</h4>
@@ -139,11 +139,10 @@
 </template>
 
 <script>
-const Modal = biigle.$require('uiv.modal');
+import BiiglebotApi from './api/biiglebot.js';
 
-const CHAT_ENDPOINT = '/biiglebot/chat';
+const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
-const OPEN_BUTTON_ID = 'biiglebot-open-button';
 
 function escapeHtml(value) {
     return value
@@ -272,9 +271,9 @@ export default {
             input: '',
             pending: false,
             messages: [],
-            buttonClickHandler: null,
             maximized: false,
             fullscreen: false,
+            openHandler: null,
             showTopShadow: false,
             showBottomShadow: false,
         };
@@ -299,12 +298,23 @@ export default {
             };
         },
     },
-    methods: {
-        getCsrfToken() {
-            const tokenTag = document.querySelector('meta[name="csrf-token"]');
-
-            return tokenTag ? tokenTag.getAttribute('content') : '';
+    watch: {
+        showModal(show) {
+            try {
+                const Keyboard = biigle.$require('keyboard');
+                if (Keyboard && typeof Keyboard.disable === 'function') {
+                    if (show) {
+                        Keyboard.disable();
+                    } else {
+                        Keyboard.enable();
+                    }
+                }
+            } catch {
+                // Keyboard module not available.
+            }
         },
+    },
+    methods: {
         roleLabel(role) {
             if (role === 'assistant') {
                 return 'BIIGLEBot';
@@ -410,32 +420,28 @@ export default {
             this.pending = true;
 
             try {
-                const response = await fetch(CHAT_ENDPOINT, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': this.getCsrfToken(),
-                    },
-                    body: JSON.stringify({
-                        message,
-                        history: this.requestHistory,
-                    }),
+                const response = await BiiglebotApi.save({}, {
+                    message,
+                    history: this.requestHistory,
                 });
 
-                const data = await response.json();
-                if (!response.ok) {
-                    this.addMessage('error', data && data.message ? data.message : 'Request failed.', [], message);
-                    return;
-                }
-
+                const data = response.body;
                 this.addMessage(
                     'assistant',
                     data && data.assistant ? data.assistant : '',
                     data && Array.isArray(data.sources) ? data.sources : []
                 );
-            } catch {
-                this.addMessage('error', 'Could not reach BIIGLEBot backend.', [], message);
+            } catch (response) {
+                const data = response && response.body;
+                let errorMessage = 'Request failed.';
+                if (data && typeof data.message === 'string' && data.message.length > 0) {
+                    errorMessage = data.message;
+                } else if (response && response.status === 504) {
+                    errorMessage = 'The AI service timed out. Click Retry to try again.';
+                } else if (response && response.status === 500) {
+                    errorMessage = 'BIIGLEBot server error. Click Retry to try again.';
+                }
+                this.addMessage('error', errorMessage, [], message);
             } finally {
                 this.pending = false;
                 this.focusInput();
@@ -510,59 +516,432 @@ export default {
             this.focusInput();
             this.updateScrollShadows();
         },
-        insertButton() {
-            if (document.getElementById(OPEN_BUTTON_ID)) {
-                return;
-            }
-
-            const navbarRight = document.getElementById('navbar-right');
-            if (!navbarRight) {
-                return;
-            }
-
-            const navList = navbarRight.querySelector('ul.navbar-nav');
-            if (!navList) {
-                return;
-            }
-
-            const item = document.createElement('li');
-            item.id = OPEN_BUTTON_ID;
-            item.innerHTML = `
-<a href="#" class="navbar-btn-link" title="Open BIIGLEBot">
-    <span class="btn btn-default">
-        <i class="fa fa-comments"></i>
-    </span>
-</a>`;
-
-            const lastItem = navList.lastElementChild;
-            if (lastItem) {
-                navList.insertBefore(item, lastItem);
-            } else {
-                navList.appendChild(item);
-            }
-        },
     },
     mounted() {
-        this.insertButton();
-        this.buttonClickHandler = (event) => {
-            const target = event.target.closest(`#${OPEN_BUTTON_ID}`);
-            if (!target) {
-                return;
-            }
-
-            event.preventDefault();
-            this.openModal();
-        };
-        document.addEventListener('click', this.buttonClickHandler);
+        this.openHandler = () => this.openModal();
+        window.addEventListener('biiglebot:open', this.openHandler);
         document.addEventListener('fullscreenchange', this.handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
     beforeUnmount() {
-        if (this.buttonClickHandler) {
-            document.removeEventListener('click', this.buttonClickHandler);
+        if (this.openHandler) {
+            window.removeEventListener('biiglebot:open', this.openHandler);
         }
         document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
         document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
 };
 </script>
+
+<style lang="scss">
+.biiglebot-chat {
+    margin-bottom: 0;
+}
+
+.biiglebot-messages {
+    background: #1f2731;
+    border: 1px solid #34414f;
+    border-radius: 4px;
+    height: 340px;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.biiglebot-empty {
+    color: #c3cfdb;
+    margin: 0;
+    text-align: center;
+}
+
+.biiglebot-row {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.biiglebot-row--assistant {
+    justify-content: flex-start;
+}
+
+.biiglebot-row--user {
+    justify-content: flex-end;
+}
+
+.biiglebot-row--error {
+    justify-content: center;
+}
+
+.biiglebot-bubble {
+    background: #2b3542;
+    border: 1px solid #415062;
+    border-radius: 14px;
+    max-width: 85%;
+    padding: 10px 12px;
+    position: relative;
+    color: #dfe8f2;
+}
+
+.biiglebot-row--assistant .biiglebot-bubble {
+    background: #233746;
+    border-color: #35566d;
+    box-shadow: inset 0 0 0 1px #2d4a5e;
+}
+
+.biiglebot-row--user .biiglebot-bubble {
+    background: #273b31;
+    border-color: #3f614f;
+    box-shadow: inset 0 0 0 1px #335041;
+}
+
+.biiglebot-row--error .biiglebot-bubble {
+    border-color: #ebccd1;
+    box-shadow: inset 0 0 0 1px #d9534f;
+}
+
+.biiglebot-retry-btn {
+    background: rgba(217, 83, 79, 0.15);
+    border: 1px solid rgba(217, 83, 79, 0.4);
+    border-radius: 999px;
+    color: #e8a09e;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    margin-top: 6px;
+    outline: none;
+    padding: 4px 10px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover,
+    &:focus {
+        background: rgba(217, 83, 79, 0.28);
+        border-color: rgba(217, 83, 79, 0.6);
+        color: #f2c4c3;
+    }
+
+    &:hover .fa-refresh {
+        animation: biiglebot-spin 0.5s ease-in-out;
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+@keyframes biiglebot-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.biiglebot-bubble__role {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.biiglebot-row--assistant .biiglebot-bubble__role {
+    color: #7fc4ea;
+}
+
+.biiglebot-row--user .biiglebot-bubble__role {
+    color: #8bdeb0;
+}
+
+.biiglebot-row--error .biiglebot-bubble__role {
+    color: #a94442;
+}
+
+.biiglebot-bubble__content {
+    color: #dfe8f2;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+        margin: 8px 0 6px;
+    }
+
+    h1 { font-size: 20px; }
+    h2 { font-size: 18px; }
+    h3 { font-size: 16px; }
+    h4, h5, h6 { font-size: 14px; }
+
+    p:last-child,
+    ul:last-child,
+    ol:last-child,
+    h1:last-child,
+    h2:last-child,
+    h3:last-child,
+    h4:last-child,
+    h5:last-child,
+    h6:last-child {
+        margin-bottom: 0;
+    }
+
+    ul, ol {
+        margin: 0 0 10px 20px;
+    }
+
+    a {
+        color: #9fd6ff;
+        text-decoration: underline;
+    }
+}
+
+.biiglebot-sources {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.biiglebot-source-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.biiglebot-source-chip {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    color: #d9e4ef;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    outline: none;
+    padding: 4px 8px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+
+    &:hover,
+    &:focus {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.34);
+    }
+}
+
+.biiglebot-sources-toggle {
+    color: #9fd6ff;
+    padding: 0;
+
+    &:hover,
+    &:focus {
+        color: #c4e7ff;
+        text-decoration: none;
+    }
+}
+
+.biiglebot-sources-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    margin-top: 6px;
+    padding: 8px;
+}
+
+.biiglebot-source-item + .biiglebot-source-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 7px;
+    padding-top: 7px;
+}
+
+.biiglebot-source-item--active {
+    background: rgba(159, 214, 255, 0.12);
+    border-radius: 6px;
+    padding: 6px;
+}
+
+.biiglebot-source-item__title {
+    align-items: baseline;
+    display: flex;
+    gap: 6px;
+}
+
+.biiglebot-source-score {
+    color: #a7b7c7;
+    font-size: 11px;
+    margin-left: auto;
+}
+
+.biiglebot-source-item__snippet {
+    color: #c8d6e4;
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+.biiglebot-footer {
+    background: #1f2731;
+    border-top: 1px solid #34414f;
+
+    .form-control {
+        background: #27313d;
+        border-color: #3d4b5a;
+        color: #e7edf4;
+
+        &::placeholder {
+            color: #a6b3c1;
+        }
+    }
+}
+
+.biiglebot-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.biiglebot-typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 2px;
+}
+
+.biiglebot-typing-dot {
+    background: #7fc4ea;
+    border-radius: 50%;
+    display: inline-block;
+    height: 8px;
+    opacity: 0.4;
+    width: 8px;
+    animation: biiglebot-bounce 1.4s ease-in-out infinite both;
+
+    &:nth-child(1) { animation-delay: 0s; }
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+}
+
+@keyframes biiglebot-bounce {
+    0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.4;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.biiglebot-btn-icon {
+    align-items: center;
+    display: inline-flex;
+    font-size: 16px;
+    height: 34px;
+    justify-content: center;
+    padding: 0;
+    width: 38px;
+}
+
+.biiglebot-modal-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+
+    .modal-title {
+        color: #dfe8f2;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+    }
+}
+
+.biiglebot-header-actions {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.biiglebot-header-btn {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #a6b3c1;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 15px;
+    height: 30px;
+    justify-content: center;
+    outline: none;
+    padding: 0;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    width: 30px;
+
+    &:hover,
+    &:focus {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.15);
+        color: #e7edf4;
+    }
+}
+
+.biiglebot-header-close {
+    font-size: 22px;
+    margin-left: 2px;
+}
+
+.biiglebot-maximized {
+    .modal-dialog {
+        margin: 1.5vh auto;
+        max-width: none;
+        width: 95vw;
+    }
+
+    .biiglebot-chat {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .biiglebot-messages {
+        flex: 1 1 auto;
+        height: calc(90vh - 200px);
+    }
+}
+
+.biiglebot-fullscreen {
+    .modal-dialog {
+        height: 100%;
+        margin: 0;
+        max-width: none;
+        width: 100%;
+    }
+
+    .modal-content {
+        border: 0;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .modal-body {
+        flex: 1 1 auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .biiglebot-chat {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .biiglebot-messages {
+        flex: 1 1 auto;
+        height: auto;
+    }
+}
+</style>
