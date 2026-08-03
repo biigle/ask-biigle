@@ -1,12 +1,12 @@
 <?php
 
-namespace Biigle\Modules\BIIGLEBot;
+namespace Biigle\Modules\AskBiigle;
 
 use Biigle\Services\Modules;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 
-class BIIGLEBotServiceProvider extends ServiceProvider
+class AskBiigleServiceProvider extends ServiceProvider
 {
     /**
      * Bootstrap the application events.
@@ -17,11 +17,11 @@ class BIIGLEBotServiceProvider extends ServiceProvider
      */
     public function boot(Modules $modules, Router $router)
     {
-        $this->loadViewsFrom(__DIR__ . "/resources/views", "biiglebot");
+        $this->loadViewsFrom(__DIR__ . "/resources/views", "ask-biigle");
 
         $router->group(
             [
-                "namespace" => "Biigle\Modules\BIIGLEBot\Http\Controllers",
+                "namespace" => "Biigle\Modules\AskBiigle\Http\Controllers",
                 "middleware" => "web",
             ],
             function ($router) {
@@ -29,7 +29,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
             },
         );
 
-        $modules->register("biiglebot", [
+        $modules->register("ask-biigle", [
             "viewMixins" => ["navbarItem"],
             "controllerMixins" => [
                 //
@@ -41,7 +41,7 @@ class BIIGLEBotServiceProvider extends ServiceProvider
 
         $this->publishes(
             [
-                __DIR__ . "/public" => public_path("vendor/biiglebot"),
+                __DIR__ . "/public" => public_path("vendor/ask-biigle"),
             ],
             "public",
         );
@@ -54,6 +54,6 @@ class BIIGLEBotServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . "/config/biiglebot.php", "biiglebot");
+        $this->mergeConfigFrom(__DIR__ . "/config/ask-biigle.php", "ask-biigle");
     }
 }
