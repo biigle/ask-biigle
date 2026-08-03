@@ -1,26 +1,16 @@
 <template>
-    <div :class="modalWrapperClasses">
-        <modal v-model="showModal" size="lg" :footer="false" append-to-body @shown="onModalShown">
+    <div>
+        <modal
+            v-model="showModal"
+            size="lg"
+            :footer="false"
+            append-to-body
+            @shown="onModalShown"
+            >
             <template #header>
                 <div class="ask-biigle-modal-header">
                     <h4 class="modal-title">Ask BIIGLE</h4>
                     <div class="ask-biigle-header-actions">
-                        <button
-                            type="button"
-                            class="ask-biigle-header-btn"
-                            :title="maximized ? 'Restore' : 'Maximize'"
-                            @click="toggleMaximize"
-                            >
-                            <i class="fa" :class="maximized ? 'fa-compress' : 'fa-expand'"></i>
-                        </button>
-                        <button
-                            type="button"
-                            class="ask-biigle-header-btn"
-                            :title="fullscreen ? 'Exit fullscreen' : 'Fullscreen'"
-                            @click="toggleFullscreen"
-                            >
-                            <i class="fa" :class="fullscreen ? 'fa-compress-arrows-alt' : 'fa-expand-arrows-alt'"></i>
-                        </button>
                         <button
                             type="button"
                             class="close ask-biigle-header-close"
@@ -271,8 +261,6 @@ export default {
             input: '',
             pending: false,
             messages: [],
-            maximized: false,
-            fullscreen: false,
             openHandler: null,
             showTopShadow: false,
             showBottomShadow: false,
@@ -290,12 +278,6 @@ export default {
                     role: message.role,
                     content: message.content,
                 }));
-        },
-        modalWrapperClasses() {
-            return {
-                'ask-biigle-maximized': this.maximized,
-                'ask-biigle-fullscreen': this.fullscreen,
-            };
         },
     },
     watch: {
@@ -461,56 +443,7 @@ export default {
             this.showModal = true;
         },
         closeModal() {
-            if (this.fullscreen) {
-                this.exitFullscreen();
-            }
             this.showModal = false;
-        },
-        toggleMaximize() {
-            this.maximized = !this.maximized;
-        },
-        toggleFullscreen() {
-            if (this.fullscreen) {
-                this.exitFullscreen();
-            } else {
-                this.enterFullscreen();
-            }
-        },
-        enterFullscreen() {
-            const wrapper = this.$el;
-            const modalEl = wrapper.querySelector('.modal');
-            if (!modalEl) {
-                return;
-            }
-
-            const request = modalEl.requestFullscreen
-                || modalEl.webkitRequestFullscreen
-                || modalEl.msRequestFullscreen;
-
-            if (request) {
-                request.call(modalEl).then(() => {
-                    this.fullscreen = true;
-                }).catch(() => {
-                    // Fullscreen not supported or denied.
-                });
-            }
-        },
-        exitFullscreen() {
-            if (document.fullscreenElement || document.webkitFullscreenElement) {
-                const exit = document.exitFullscreen
-                    || document.webkitExitFullscreen
-                    || document.msExitFullscreen;
-
-                if (exit) {
-                    exit.call(document);
-                }
-            }
-            this.fullscreen = false;
-        },
-        handleFullscreenChange() {
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                this.fullscreen = false;
-            }
         },
         onModalShown() {
             this.focusInput();
@@ -520,15 +453,11 @@ export default {
     mounted() {
         this.openHandler = () => this.openModal();
         window.addEventListener('ask-biigle:open', this.openHandler);
-        document.addEventListener('fullscreenchange', this.handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
     beforeUnmount() {
         if (this.openHandler) {
             window.removeEventListener('ask-biigle:open', this.openHandler);
         }
-        document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
-        document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     },
 };
 </script>
@@ -705,8 +634,6 @@ export default {
     }
 }
 
-/* --- Modal header with maximize / fullscreen buttons --- */
-
 .ask-biigle-modal-header {
     align-items: center;
     display: flex;
@@ -727,82 +654,8 @@ export default {
     margin-left: auto;
 }
 
-.ask-biigle-header-btn {
-    color: #fff;
-    opacity: .2;
-    align-items: center;
-    background: transparent;
-    border-color: transparent;
-    display: inline-flex;
-    font-size: 15px;
-    height: 30px;
-    justify-content: center;
-    outline: none;
-    padding: 0;
-    width: 30px;
-}
-
-.ask-biigle-header-btn:hover,
-.ask-biigle-header-btn:focus {
-    opacity: .5;
-}
-
 .ask-biigle-header-close {
     font-size: 22px;
     margin-left: 2px;
-}
-
-/* --- Maximized state --- */
-
-.ask-biigle-maximized .modal-dialog {
-    margin: 1.5vh auto;
-    max-width: none;
-    width: 95vw;
-}
-
-.ask-biigle-maximized .ask-biigle-chat {
-    display: flex;
-    flex-direction: column;
-}
-
-.ask-biigle-maximized .ask-biigle-messages {
-    flex: 1 1 auto;
-    height: calc(90vh - 200px);
-}
-
-/* --- Fullscreen state --- */
-
-.ask-biigle-fullscreen .modal-dialog {
-    height: 100%;
-    margin: 0;
-    max-width: none;
-    width: 100%;
-}
-
-.ask-biigle-fullscreen .modal-content {
-    border: 0;
-    border-radius: 0;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.ask-biigle-fullscreen .modal-body {
-    flex: 1 1 auto;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.ask-biigle-fullscreen .ask-biigle-chat {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.ask-biigle-fullscreen .ask-biigle-messages {
-    flex: 1 1 auto;
-    height: auto;
 }
 </style>
