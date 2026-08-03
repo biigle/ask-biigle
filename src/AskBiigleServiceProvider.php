@@ -30,7 +30,7 @@ class AskBiigleServiceProvider extends ServiceProvider
         );
 
         $modules->register("ask-biigle", [
-            "viewMixins" => ["navbarItem"],
+            "viewMixins" => ["navbarHelpItemTop"],
             "controllerMixins" => [
                 //
             ],

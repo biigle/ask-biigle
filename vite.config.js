@@ -27,6 +27,14 @@ export default defineConfig({
             },
         }),
     ],
+    css: {
+        preprocessorOptions: {
+            scss: {
+                // SCSS of biigle/core, relative to the module root in vendor/biigle/*.
+                loadPaths: ['../../../resources/assets/sass'],
+            },
+        },
+    },
     build: {
         rolldownOptions: {
             // Ensure that Vue is loaded through the importmap of biigle/core in build.

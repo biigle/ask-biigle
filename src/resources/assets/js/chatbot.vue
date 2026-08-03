@@ -534,22 +534,35 @@ export default {
 </script>
 
 <style lang="scss">
+@use "bootstrap/variables" as *;
+
 .ask-biigle-chat {
     margin-bottom: 0;
 }
 
 .ask-biigle-messages {
-    background: #1f2731;
-    border: 1px solid #34414f;
-    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
     height: 340px;
     overflow-y: auto;
     padding: 12px;
 }
 
+.ask-biigle-messages--shadow-top {
+    box-shadow: inset 0 8px 8px -8px #000;
+}
+
+.ask-biigle-messages--shadow-bottom {
+    box-shadow: inset 0 -8px 8px -8px #000;
+}
+
+.ask-biigle-messages--shadow-top.ask-biigle-messages--shadow-bottom {
+    box-shadow: inset 0 8px 8px -8px #000, inset 0 -8px 8px -8px #000;
+}
+
 .ask-biigle-empty {
-    color: #c3cfdb;
-    margin: 0;
+    color: $brand-info;
+    margin: auto;
     text-align: center;
 }
 
@@ -558,7 +571,7 @@ export default {
     margin-bottom: 10px;
 }
 
-.ask-biigle-row--assistant {
+.ask-biigle-row--assistant, .ask-biigle-row--error {
     justify-content: flex-start;
 }
 
@@ -566,78 +579,24 @@ export default {
     justify-content: flex-end;
 }
 
-.ask-biigle-row--error {
-    justify-content: center;
-}
-
 .ask-biigle-bubble {
-    background: #2b3542;
-    border: 1px solid #415062;
-    border-radius: 14px;
+    border: 1px solid $panel-default-border;
+    border-radius: $border-radius-base;
     max-width: 85%;
     padding: 10px 12px;
     position: relative;
-    color: #dfe8f2;
 }
 
 .ask-biigle-row--assistant .ask-biigle-bubble {
-    background: #233746;
-    border-color: #35566d;
-    box-shadow: inset 0 0 0 1px #2d4a5e;
-}
-
-.ask-biigle-row--user .ask-biigle-bubble {
-    background: #273b31;
-    border-color: #3f614f;
-    box-shadow: inset 0 0 0 1px #335041;
+    border-color: $panel-info-border;
 }
 
 .ask-biigle-row--error .ask-biigle-bubble {
-    border-color: #ebccd1;
-    box-shadow: inset 0 0 0 1px #d9534f;
+    border-color: $panel-danger-border;
 }
 
 .ask-biigle-retry-btn {
-    background: rgba(217, 83, 79, 0.15);
-    border: 1px solid rgba(217, 83, 79, 0.4);
-    border-radius: 999px;
-    color: #e8a09e;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
     margin-top: 6px;
-    outline: none;
-    padding: 4px 10px;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-
-    &:hover,
-    &:focus {
-        background: rgba(217, 83, 79, 0.28);
-        border-color: rgba(217, 83, 79, 0.6);
-        color: #f2c4c3;
-    }
-
-    &:hover .fa-refresh {
-        animation: ask-biigle-spin 0.5s ease-in-out;
-    }
-
-    &:disabled {
-        cursor: not-allowed;
-        opacity: 0.5;
-    }
-}
-
-@keyframes ask-biigle-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
 }
 
 .ask-biigle-bubble__role {
@@ -646,52 +605,12 @@ export default {
 }
 
 .ask-biigle-row--assistant .ask-biigle-bubble__role {
-    color: #7fc4ea;
-}
-
-.ask-biigle-row--user .ask-biigle-bubble__role {
-    color: #8bdeb0;
-}
-
-.ask-biigle-row--error .ask-biigle-bubble__role {
-    color: #a94442;
+    color: $brand-info;
 }
 
 .ask-biigle-bubble__content {
-    color: #dfe8f2;
     white-space: pre-wrap;
     word-break: break-word;
-
-    h1, h2, h3, h4, h5, h6 {
-        font-weight: 700;
-        margin: 8px 0 6px;
-    }
-
-    h1 { font-size: 20px; }
-    h2 { font-size: 18px; }
-    h3 { font-size: 16px; }
-    h4, h5, h6 { font-size: 14px; }
-
-    p:last-child,
-    ul:last-child,
-    ol:last-child,
-    h1:last-child,
-    h2:last-child,
-    h3:last-child,
-    h4:last-child,
-    h5:last-child,
-    h6:last-child {
-        margin-bottom: 0;
-    }
-
-    ul, ol {
-        margin: 0 0 10px 20px;
-    }
-
-    a {
-        color: #9fd6ff;
-        text-decoration: underline;
-    }
 }
 
 .ask-biigle-sources {
@@ -707,56 +626,8 @@ export default {
     margin-bottom: 4px;
 }
 
-.ask-biigle-source-chip {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 999px;
-    color: #d9e4ef;
-    cursor: pointer;
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-    outline: none;
-    padding: 4px 8px;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-
-    &:hover,
-    &:focus {
-        background: rgba(255, 255, 255, 0.2);
-        border-color: rgba(255, 255, 255, 0.34);
-    }
-}
-
-.ask-biigle-sources-toggle {
-    color: #9fd6ff;
-    padding: 0;
-
-    &:hover,
-    &:focus {
-        color: #c4e7ff;
-        text-decoration: none;
-    }
-}
-
 .ask-biigle-sources-panel {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
     margin-top: 6px;
-    padding: 8px;
-}
-
-.ask-biigle-source-item + .ask-biigle-source-item {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    margin-top: 7px;
-    padding-top: 7px;
-}
-
-.ask-biigle-source-item--active {
-    background: rgba(159, 214, 255, 0.12);
-    border-radius: 6px;
-    padding: 6px;
 }
 
 .ask-biigle-source-item__title {
@@ -766,37 +637,28 @@ export default {
 }
 
 .ask-biigle-source-score {
-    color: #a7b7c7;
     font-size: 11px;
     margin-left: auto;
+    opacity: 0.7;
 }
 
 .ask-biigle-source-item__snippet {
-    color: #c8d6e4;
     font-size: 12px;
     margin-top: 3px;
+    opacity: 0.85;
 }
 
 .ask-biigle-footer {
-    background: #1f2731;
-    border-top: 1px solid #34414f;
-
-    .form-control {
-        background: #27313d;
-        border-color: #3d4b5a;
-        color: #e7edf4;
-
-        &::placeholder {
-            color: #a6b3c1;
-        }
-    }
+    background: transparent;
+    border-top: 1px solid $panel-default-border;
 }
 
 .ask-biigle-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
     margin-top: 10px;
+}
+
+#biiglebot-open-button .btn {
+    min-width: 44px;
 }
 
 .ask-biigle-typing-indicator {
@@ -807,52 +669,55 @@ export default {
 }
 
 .ask-biigle-typing-dot {
-    background: #7fc4ea;
+    background: $brand-info;
     border-radius: 50%;
     display: inline-block;
     height: 8px;
     opacity: 0.4;
     width: 8px;
-    animation: ask-biigle-bounce 1.4s ease-in-out infinite both;
-
-    &:nth-child(1) { animation-delay: 0s; }
-    &:nth-child(2) { animation-delay: 0.2s; }
-    &:nth-child(3) { animation-delay: 0.4s; }
+    animation: biiglebot-bounce 1.4s ease-in-out infinite both;
 }
 
-@keyframes ask-biigle-bounce {
-    0%, 80%, 100% {
+.ask-biigle-typing-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.ask-biigle-typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.ask-biigle-typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes biiglebot-bounce {
+
+    0%,
+    80%,
+    100% {
         transform: scale(0.6);
         opacity: 0.4;
     }
+
     40% {
         transform: scale(1);
         opacity: 1;
     }
 }
 
-.ask-biigle-btn-icon {
-    align-items: center;
-    display: inline-flex;
-    font-size: 16px;
-    height: 34px;
-    justify-content: center;
-    padding: 0;
-    width: 38px;
-}
+/* --- Modal header with maximize / fullscreen buttons --- */
 
 .ask-biigle-modal-header {
     align-items: center;
     display: flex;
     justify-content: space-between;
     width: 100%;
+}
 
-    .modal-title {
-        color: #dfe8f2;
-        font-size: 18px;
-        font-weight: 700;
-        margin: 0;
-    }
+.ask-biigle-modal-header .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
 }
 
 .ask-biigle-header-actions {
@@ -863,27 +728,23 @@ export default {
 }
 
 .ask-biigle-header-btn {
+    color: #fff;
+    opacity: .2;
     align-items: center;
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    color: #a6b3c1;
-    cursor: pointer;
+    border-color: transparent;
     display: inline-flex;
     font-size: 15px;
     height: 30px;
     justify-content: center;
     outline: none;
     padding: 0;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     width: 30px;
+}
 
-    &:hover,
-    &:focus {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.15);
-        color: #e7edf4;
-    }
+.ask-biigle-header-btn:hover,
+.ask-biigle-header-btn:focus {
+    opacity: .5;
 }
 
 .ask-biigle-header-close {
@@ -891,57 +752,57 @@ export default {
     margin-left: 2px;
 }
 
-.ask-biigle-maximized {
-    .modal-dialog {
-        margin: 1.5vh auto;
-        max-width: none;
-        width: 95vw;
-    }
+/* --- Maximized state --- */
 
-    .ask-biigle-chat {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .ask-biigle-messages {
-        flex: 1 1 auto;
-        height: calc(90vh - 200px);
-    }
+.ask-biigle-maximized .modal-dialog {
+    margin: 1.5vh auto;
+    max-width: none;
+    width: 95vw;
 }
 
-.ask-biigle-fullscreen {
-    .modal-dialog {
-        height: 100%;
-        margin: 0;
-        max-width: none;
-        width: 100%;
-    }
+.ask-biigle-maximized .ask-biigle-chat {
+    display: flex;
+    flex-direction: column;
+}
 
-    .modal-content {
-        border: 0;
-        border-radius: 0;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
+.ask-biigle-maximized .ask-biigle-messages {
+    flex: 1 1 auto;
+    height: calc(90vh - 200px);
+}
 
-    .modal-body {
-        flex: 1 1 auto;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-    }
+/* --- Fullscreen state --- */
 
-    .ask-biigle-chat {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        overflow: hidden;
-    }
+.ask-biigle-fullscreen .modal-dialog {
+    height: 100%;
+    margin: 0;
+    max-width: none;
+    width: 100%;
+}
 
-    .ask-biigle-messages {
-        flex: 1 1 auto;
-        height: auto;
-    }
+.ask-biigle-fullscreen .modal-content {
+    border: 0;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.ask-biigle-fullscreen .modal-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.ask-biigle-fullscreen .ask-biigle-chat {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ask-biigle-fullscreen .ask-biigle-messages {
+    flex: 1 1 auto;
+    height: auto;
 }
 </style>
