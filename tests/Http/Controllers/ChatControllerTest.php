@@ -29,7 +29,7 @@ class ChatControllerTest extends TestCase
         $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
             ->assertStatus(422)
             ->assertJsonFragment([
-                'message' => 'AskBiigle is not configured. Please set AskBiigle_LLM_API_URL, AskBiigle_LLM_API_KEY and AskBiigle_LLM_ALGORITHM.',
+                'message' => 'AskBiigle is not configured. Please set ASK_BIIGLE_LLM_API_URL, ASK_BIIGLE_LLM_API_KEY and ASK_BIIGLE_LLM_ALGORITHM.',
             ]);
     }
 
