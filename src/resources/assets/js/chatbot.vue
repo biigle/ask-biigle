@@ -4,7 +4,7 @@
         size="lg"
         :footer="false"
         append-to-body
-        @shown="onModalShown"
+        @show="onModalShown"
         >
         <template #header>
             <div class="ask-biigle-modal-header">
