@@ -6,6 +6,7 @@ use Biigle\Http\Controllers\Views\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 
 class ChatController extends Controller
@@ -89,12 +90,12 @@ class ChatController extends Controller
                 $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
 
                 if ($attempt < $maxTries && ($response->status() >= 500 || $errMsg === 'ReadTimeout')) {
-                    usleep(1000000); // 1s delay before retry
+                    Sleep::for(1)->second();
                     continue;
                 }
             } catch (\Illuminate\Http\Client\ConnectionException $e) {
                 if ($attempt < $maxTries) {
-                    usleep(1000000);
+                    Sleep::for(1)->second();
                     continue;
                 }
 
@@ -143,12 +144,31 @@ class ChatController extends Controller
                 ->implode("\n");
         }
 
-        $rawContent = (string) ($content ?? '');
+        $rawContent = $this->normalizeNewlines((string) ($content ?? ''));
 
         return response()->json([
             'assistant' => $this->cleanAssistantContent($rawContent),
             'sources' => $this->extractSources($rawContent),
         ]);
+    }
+
+    /**
+     * Unescape newlines of responses that arrive escaped from the upstream service.
+     *
+     * Some responses contain literal "\n" sequences instead of actual newlines. Content
+     * that has actual newlines is left untouched, as literal "\n" sequences may be part
+     * of the content there (e.g. in a code block).
+     *
+     * @param string $content
+     * @return string
+     */
+    protected function normalizeNewlines($content)
+    {
+        if (!str_contains($content, "\n") && str_contains($content, '\n')) {
+            return str_replace('\n', "\n", $content);
+        }
+
+        return $content;
     }
 
     /**
