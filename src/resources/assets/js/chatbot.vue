@@ -247,6 +247,36 @@ function renderMarkdown(value) {
     return html.join('');
 }
 
+const STORAGE_KEY = 'ask-biigle.messages';
+
+function loadMessages() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+    } catch {
+        // Fallback if localStorage access or JSON parsing fails.
+    }
+
+    return [];
+}
+
+function saveMessages(messages) {
+    try {
+        if (messages && messages.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    } catch {
+        // Fallback if localStorage access fails.
+    }
+}
+
 export default {
     components: {
         modal: Modal,
@@ -256,7 +286,7 @@ export default {
             showModal: false,
             input: '',
             pending: false,
-            messages: [],
+            messages: loadMessages(),
             openHandler: null,
             showTopShadow: false,
             showBottomShadow: false,
@@ -277,6 +307,12 @@ export default {
         },
     },
     watch: {
+        messages: {
+            deep: true,
+            handler(newMessages) {
+                saveMessages(newMessages);
+            },
+        },
         showModal(show) {
             try {
                 const Keyboard = biigle.$require('keyboard');
@@ -443,6 +479,7 @@ export default {
         },
         onModalShown() {
             this.focusInput();
+            this.scrollToBottom();
             this.updateScrollShadows();
         },
     },
