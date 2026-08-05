@@ -127,6 +127,48 @@ class ChatControllerTest extends TestCase
         $this->assertSame('RREF1', $sources[0]['id']);
     }
 
+    public function testEscapedNewlines()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'choices' => [
+                    // Single quotes, so the content contains literal "\n" sequences.
+                    ['message' => ['content' => 'First line.\nSecond line.\n\nReferences:\n[RREF1] 22.html.md (0.521) First source text.']],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
+        $response->assertStatus(200);
+
+        $this->assertSame("First line.\nSecond line.", $response->json('assistant'));
+        $this->assertCount(1, $response->json('sources'));
+    }
+
+    public function testEscapedNewlinesKeepsRealNewlines()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => "Use the pattern `a\\nb` here.\n\nDone."]],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
+        $response->assertStatus(200);
+
+        $this->assertSame("Use the pattern `a\\nb` here.\n\nDone.", $response->json('assistant'));
+    }
+
     protected function configureBot()
     {
         config([
