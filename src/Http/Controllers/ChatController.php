@@ -6,6 +6,7 @@ use Biigle\Http\Controllers\Views\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
 
 class ChatController extends Controller
@@ -89,12 +90,12 @@ class ChatController extends Controller
                 $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
 
                 if ($attempt < $maxTries && ($response->status() >= 500 || $errMsg === 'ReadTimeout')) {
-                    usleep(1000000); // 1s delay before retry
+                    Sleep::for(1)->second();
                     continue;
                 }
             } catch (\Illuminate\Http\Client\ConnectionException $e) {
                 if ($attempt < $maxTries) {
-                    usleep(1000000);
+                    Sleep::for(1)->second();
                     continue;
                 }
 

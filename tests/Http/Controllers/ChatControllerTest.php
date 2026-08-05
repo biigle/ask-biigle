@@ -4,6 +4,7 @@ namespace Biigle\Tests\Modules\AskBiigle\Http\Controllers;
 
 use Biigle\Tests\UserTest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use TestCase;
 
 class ChatControllerTest extends TestCase
@@ -69,6 +70,7 @@ class ChatControllerTest extends TestCase
         $user = UserTest::create();
         $this->be($user);
         $this->configureBot();
+        Sleep::fake();
 
         Http::fake([
             'https://chat-ai.academiccloud.de/*' => Http::response([
@@ -79,6 +81,9 @@ class ChatControllerTest extends TestCase
         $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
             ->assertStatus(500)
             ->assertJsonStructure(['message']);
+
+        Http::assertSentCount(3);
+        Sleep::assertSleptTimes(2);
     }
 
     public function testHistoryTooLong()
