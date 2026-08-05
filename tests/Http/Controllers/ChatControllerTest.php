@@ -174,6 +174,100 @@ class ChatControllerTest extends TestCase
         $this->assertSame("Use the pattern `a\\nb` here.\n\nDone.", $response->json('assistant'));
     }
 
+    public function testStreamedResponse()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        $ssePayload = "data: {\"choices\":[{\"delta\":{\"content\":\"Hello \"}}]}\n\n"
+            ."data: {\"choices\":[{\"delta\":{\"content\":\"world [RREF1] [RREF2].\\n\\nReferences:\\n[RREF1] doc.md (0.95) Snippet text.\\n[RREF2] other.md (0.51) Second snippet.\"}}]}\n\n"
+            ."data: [DONE]\n\n";
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response($ssePayload, 200, [
+                'Content-Type' => 'text/event-stream',
+            ]),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', [
+            'message' => 'Hello',
+            'stream' => true,
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertSame('text/event-stream', $response->headers->get('Content-Type'));
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('data: {"type":"delta","content":"Hello "}', $content);
+        $this->assertStringContainsString('"type":"done"', $content);
+        // Every marker is stripped, not just the first one.
+        $this->assertStringContainsString('"assistant":"Hello world."', $content);
+        $this->assertStringContainsString('"id":"RREF1"', $content);
+        $this->assertStringContainsString('"id":"RREF2"', $content);
+        $this->assertStringEndsWith("data: [DONE]\n\n", $content);
+    }
+
+    public function testStreamedResponseUpstreamFailure()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'error' => ['message' => 'upstream failure'],
+            ], 400),
+        ]);
+
+        // Failures that happen before the first token are reported with a
+        // proper status code instead of an event stream.
+        $this->json('POST', 'ask-biigle/chat', [
+            'message' => 'Hello',
+            'stream' => true,
+        ])->assertStatus(400)->assertJsonStructure(['message']);
+    }
+
+    public function testStreamNegotiationDefaultsToJson()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'choices' => [['message' => ['content' => 'Answer text.']]],
+            ], 200),
+        ]);
+
+        $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
+            ->assertStatus(200)
+            ->assertJson(['assistant' => 'Answer text.']);
+
+        Http::assertSent(fn ($request) => !array_key_exists('stream', $request->data()));
+    }
+
+    public function testStreamNegotiationHonorsFalse()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'choices' => [['message' => ['content' => 'Answer text.']]],
+            ], 200),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', [
+            'message' => 'Hello',
+            'stream' => false,
+        ], ['Accept' => 'text/event-stream']);
+
+        $response->assertStatus(200)->assertJson(['assistant' => 'Answer text.']);
+    }
+
     protected function configureBot()
     {
         config([
