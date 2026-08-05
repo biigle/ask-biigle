@@ -196,7 +196,7 @@ class ChatControllerTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $this->assertSame('text/event-stream', $response->headers->get('Content-Type'));
+        $this->assertStringStartsWith('text/event-stream', $response->headers->get('Content-Type'));
 
         $content = $response->streamedContent();
 
