@@ -2,6 +2,10 @@
   "name": "ask-biigle",
   "version": "0.0.1",
   "license": "GPL-3.0-only",
+  "dependencies": {
+    "dompurify": "^3.2.4",
+    "marked": "^18.0.7"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && php ../../../artisan vendor:publish --provider Biigle\\\\Modules\\\\AskBiigle\\\\AskBiigleServiceProvider --tag public --force",
