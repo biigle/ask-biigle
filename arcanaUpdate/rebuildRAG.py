@@ -8,8 +8,8 @@ This script updates the BIIGLE Arcana by performing the following steps:
 1. Downloads the latest BIIGLE manual HTML pages using `download_manual` from `download_manual_html`.
 2. Reads credentials (`ASK_BIIGLE_LLM_API_KEY`, `ASK_BIIGLE_LLM_ARCANA_ID`) from the main BIIGLE `.env` file (`../../../../.env`).
 3. Lists all existing files in the Arcana.
-4. (Default) Downloads existing `.html` files from Arcana and compares them against the local scraped files.
-5. Deletes only missing or modified `.html` files and uploads new or changed `.html` files.
+4. (Default) Downloads existing tracked files (`.html` and `goldenFacts.md`) from Arcana and compares them against local files.
+5. Deletes only missing or modified files and uploads new or changed files.
 6. Triggers indexing for the Arcana if changes occurred and waits for completion.
 """
 
@@ -26,6 +26,7 @@ from download_manual_html import download_manual
 API_BASE_URL = "https://chat-ai.academiccloud.de/v1/arcanas/api/v1"
 ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.env"))
 MANUAL_HTML_DIR = os.path.join(os.path.dirname(__file__), "manualhtml")
+GOLDEN_FACTS_PATH = os.path.join(os.path.dirname(__file__), "goldenFacts.md")
 
 
 def load_env_file(filepath: str) -> dict:
@@ -66,7 +67,7 @@ def main():
         "--no-compare",
         dest="force",
         action="store_true",
-        help="Force deletion and re-upload of all HTML files without comparing against existing files in Arcana.",
+        help="Force deletion and re-upload of all tracked files without comparing against existing files in Arcana.",
     )
     parser.add_argument(
         "--skip-scrape",
@@ -106,7 +107,17 @@ def main():
     else:
         print("\n⏭️  Skipping manual HTML download (--skip-scrape).")
 
-    # 3. List all files of the arcana
+    # 3. Build local managed files dict
+    local_files = {}
+    if os.path.exists(MANUAL_HTML_DIR):
+        for fname in sorted(os.listdir(MANUAL_HTML_DIR)):
+            if fname.endswith(".html"):
+                local_files[fname] = os.path.join(MANUAL_HTML_DIR, fname)
+
+    if os.path.exists(GOLDEN_FACTS_PATH):
+        local_files["goldenFacts.md"] = GOLDEN_FACTS_PATH
+
+    # 4. List existing files of the arcana
     print("\n--------------------------------------------------")
     print("2️⃣  Listing existing files in Arcana...")
     print("--------------------------------------------------")
@@ -114,33 +125,33 @@ def main():
     resp.raise_for_status()
     existing_files = resp.json()
 
-    existing_html_files = {f["name"]: f for f in existing_files if f["name"].endswith(".html")}
-    print(f"Found {len(existing_files)} file(s) in Arcana '{arcana_name}' ({len(existing_html_files)} HTML file(s)).")
-
-    local_html_files = sorted([f for f in os.listdir(MANUAL_HTML_DIR) if f.endswith(".html")])
+    existing_tracked_files = {
+        f["name"]: f for f in existing_files
+        if f["name"].endswith(".html") or f["name"] == "goldenFacts.md"
+    }
+    print(f"Found {len(existing_files)} file(s) in Arcana '{arcana_name}' ({len(existing_tracked_files)} tracked file(s)).")
 
     files_to_delete = []
     files_to_upload = []
 
     if args.force:
         print("\n--------------------------------------------------")
-        print("3️⃣  [FORCE MODE] Marking all HTML files for deletion and re-upload...")
+        print("3️⃣  [FORCE MODE] Marking all tracked files for deletion and re-upload...")
         print("--------------------------------------------------")
-        files_to_delete = list(existing_html_files.keys())
-        files_to_upload = local_html_files
+        files_to_delete = list(existing_tracked_files.keys())
+        files_to_upload = list(local_files.keys())
     else:
-        # Compare remote vs local HTML files
+        # Compare remote vs local files
         print("\n--------------------------------------------------")
-        print("3️⃣  Comparing remote HTML files with local scraped files...")
+        print("3️⃣  Comparing remote files with local files...")
         print("--------------------------------------------------")
 
         unchanged_count = 0
-        for fname in local_html_files:
-            local_filepath = os.path.join(MANUAL_HTML_DIR, fname)
+        for fname, local_filepath in local_files.items():
             with open(local_filepath, "rb") as f_obj:
                 local_bytes = f_obj.read()
 
-            if fname in existing_html_files:
+            if fname in existing_tracked_files:
                 # Download remote file content for comparison
                 dl_resp = client.get(
                     f"{API_BASE_URL}/arcana/{arcana_name}/files/{fname}/download",
@@ -156,9 +167,9 @@ def main():
                 print(f"  ➕ New local file: {fname}")
                 files_to_upload.append(fname)
 
-        # Check for remote files that no longer exist locally
-        for fname in existing_html_files:
-            if fname not in local_html_files:
+        # Check for remote tracked files that no longer exist locally
+        for fname in existing_tracked_files:
+            if fname not in local_files:
                 print(f"  🗑️  Stale remote file (no longer exists locally): {fname}")
                 files_to_delete.append(fname)
 
@@ -168,28 +179,29 @@ def main():
         print(f"   To Upload: {len(files_to_upload)}")
 
     if not files_to_delete and not files_to_upload and not args.force:
-        print("\n✨ No HTML file changes detected. Arcana is up to date!")
+        print("\n✨ No file changes detected. Arcana is up to date!")
         sys.exit(0)
 
-    # 4. Remove changed/stale html files
+    # 5. Remove changed/stale files from Arcana
     if files_to_delete:
         print("\n--------------------------------------------------")
-        print("4️⃣  Removing modified/stale HTML files from Arcana...")
+        print("4️⃣  Removing modified/stale files from Arcana...")
         print("--------------------------------------------------")
         for fname in files_to_delete:
             del_resp = client.delete(f"{API_BASE_URL}/arcana/{arcana_name}/files/{fname}", headers=headers)
             del_resp.raise_for_status()
             print(f"  🗑️  Deleted: {fname}")
 
-    # 5. Upload new/modified html files
+    # 6. Upload new/modified files to Arcana
     if files_to_upload:
         print("\n--------------------------------------------------")
-        print("5️⃣  Uploading new/modified HTML files to Arcana...")
+        print("5️⃣  Uploading new/modified files to Arcana...")
         print("--------------------------------------------------")
         for idx, fname in enumerate(files_to_upload, start=1):
-            filepath = os.path.join(MANUAL_HTML_DIR, fname)
+            filepath = local_files[fname]
+            mime_type = "text/markdown" if fname.endswith(".md") else "text/html"
             with open(filepath, "rb") as f_obj:
-                files = {"file": (fname, f_obj, "text/html")}
+                files = {"file": (fname, f_obj, mime_type)}
                 up_resp = client.post(
                     f"{API_BASE_URL}/arcana/{arcana_name}/files/",
                     headers=headers,
@@ -198,7 +210,7 @@ def main():
                 up_resp.raise_for_status()
             print(f"  📤 [{idx}/{len(files_to_upload)}] Uploaded: {fname}")
 
-    # 6. Trigger indexing
+    # 7. Trigger indexing
     print("\n--------------------------------------------------")
     print("6️⃣  Triggering indexing for Arcana...")
     print("--------------------------------------------------")
