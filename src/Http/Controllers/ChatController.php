@@ -126,6 +126,8 @@ class ChatController extends Controller
             $message = 'AskBiigle request failed.';
             if ($errMsg === 'ReadTimeout') {
                 $message = 'The upstream AI service (AcademicCloud) encountered a timeout. Please click Retry to try again.';
+            } elseif ($errMsg && (str_contains($errMsg, "'NoneType' object is not subscriptable") || str_contains($errMsg, 'Error generating output from arcana'))) {
+                $message = 'The documentation index is currently being regenerated. Please try again in a few minutes.';
             } elseif ($errMsg) {
                 $message = 'AskBiigle request failed: '.$errMsg;
             }
