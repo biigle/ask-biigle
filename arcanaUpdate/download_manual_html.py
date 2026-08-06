@@ -3,7 +3,8 @@
 BIIGLE Manual HTML Downloader
 =============================
 Crawls https://biigle.de/manual and downloads all manual HTML pages
-into the `manualhtml` directory as 0.html, 1.html, 2.html, etc.
+into the `manualhtml` directory using descriptive filenames derived from URL paths
+(e.g., `manual_annotations.html`).
 Also generates a `url_map.json` to keep track of URL-to-filename mappings.
 """
 
@@ -53,6 +54,23 @@ def is_valid_manual_url(url):
     return parsed.path.startswith("/manual")
 
 
+def url_to_filename(url, used_filenames):
+    """Derives a descriptive filename from the URL path (e.g. /manual/annotations -> manual_annotations.html)."""
+    norm = normalize_url(url)
+    path = urlparse(norm).path.strip("/")
+    base = path.replace("/", "_") if path else "manual"
+    base = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in base)
+
+    candidate = f"{base}.html"
+    counter = 1
+    while candidate in used_filenames:
+        candidate = f"{base}_{counter}.html"
+        counter += 1
+
+    used_filenames.add(candidate)
+    return candidate
+
+
 def download_manual():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -65,6 +83,7 @@ def download_manual():
                 pass
 
     visited_urls = set()
+    used_filenames = set()
     queue = [BASE_URL]
     url_to_file = {}
     file_to_url = {}
@@ -81,7 +100,7 @@ def download_manual():
             continue
 
         visited_urls.add(current_url)
-        filename = f"{file_counter}.html"
+        filename = url_to_filename(current_url, used_filenames)
         filepath = os.path.join(OUTPUT_DIR, filename)
 
         req = Request(current_url, headers={"User-Agent": USER_AGENT})
@@ -100,7 +119,7 @@ def download_manual():
 
             url_to_file[current_url] = filename
             file_to_url[filename] = current_url
-            print(f"  [{file_counter}] Downloaded: {current_url} -> {filename}", flush=True)
+            print(f"  [{file_counter + 1}] Downloaded: {current_url} -> {filename}", flush=True)
             file_counter += 1
 
             # Extract links for further crawling
@@ -134,3 +153,4 @@ def download_manual():
 
 if __name__ == "__main__":
     download_manual()
+
