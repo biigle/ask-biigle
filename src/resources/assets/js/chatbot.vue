@@ -26,7 +26,7 @@
                 @scroll="updateScrollShadows"
                 >
                 <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
-                    Ask anything about using BIIGLE 2.0.
+                    Ask anything about using BIIGLE.
                 </p>
                 <div
                     v-for="(message, index) in messages"
@@ -223,12 +223,6 @@ export default {
         },
     },
     watch: {
-        messages: {
-            deep: true,
-            handler(newMessages) {
-                saveMessages(newMessages);
-            },
-        },
         showModal(show) {
             if (!show) {
                 // Don't keep a pending answer running in the background.
@@ -293,6 +287,7 @@ export default {
                 activeSourceId: null,
                 failedUserMessage,
             });
+            saveMessages(this.messages);
             this.scrollToBottom();
         },
         toggleSources(index) {
@@ -337,6 +332,7 @@ export default {
         },
         clearChat() {
             this.messages = [];
+            saveMessages(this.messages);
             this.showTopShadow = false;
             this.showBottomShadow = false;
         },
@@ -372,7 +368,7 @@ export default {
             const assistantMsg = this.messages[this.messages.length - 1];
             this.scrollToBottom();
 
-            // Deltas arrive token by token but the whole message is rendered
+            // Deltas arrive line by line but the whole message is rendered
             // anew on each update, so they are applied once per frame.
             let buffered = '';
             let frame = null;
@@ -431,6 +427,9 @@ export default {
                 this.addMessage('error', errorMessage, [], message);
             } finally {
                 flushBuffer();
+                // The messages are stored only here and not on every update of the
+                // stream, as writing to localStorage is expensive.
+                saveMessages(this.messages);
                 this.abortController = null;
                 this.pending = false;
                 this.focusInput();

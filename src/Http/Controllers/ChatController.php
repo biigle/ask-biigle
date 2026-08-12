@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class ChatController extends Controller
 {
@@ -25,18 +26,12 @@ class ChatController extends Controller
     const MAX_TRIES = 3;
 
     /**
-     * Delay in microseconds between two upstream attempts.
-     *
-     * @var int
-     */
-    const RETRY_DELAY = 1000000;
-
-    /**
      * Forward a user message to the configured OpenAI-compatible backend.
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
      * @throws ValidationException
+     * @throws RuntimeException
      */
     public function chat(Request $request)
     {
@@ -45,7 +40,6 @@ class ChatController extends Controller
             'history' => 'sometimes|array|max:20',
             'history.*.role' => 'required_with:history|string|in:user,assistant',
             'history.*.content' => 'required_with:history|string',
-            'stream' => 'sometimes|boolean',
         ]);
 
         $apiKey = config('ask-biigle.llm_api_key');
@@ -55,6 +49,15 @@ class ChatController extends Controller
             throw ValidationException::withMessages([
                 'message' => ['AskBiigle is not configured. Please set ASK_BIIGLE_LLM_API_URL, ASK_BIIGLE_LLM_API_KEY and ASK_BIIGLE_LLM_ALGORITHM.'],
             ]);
+        }
+
+        // Guzzle only streams the response body if it uses the PHP stream handler,
+        // which in turn requires allow_url_fopen. Its default cURL handler buffers the
+        // whole body before it returns, which would defeat the purpose of this
+        // endpoint. Also, the timeout of the cURL handler applies to the whole transfer
+        // instead of a single read, so long answers would be truncated.
+        if (!filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
+            throw new RuntimeException('AskBiigle cannot stream the chat response because allow_url_fopen is disabled.');
         }
 
         $messages = [
@@ -76,21 +79,14 @@ class ChatController extends Controller
             'content' => $validated['message'],
         ];
 
-        $shouldStream = $request->has('stream')
-            ? $request->boolean('stream')
-            : str_contains((string) $request->header('Accept'), 'text/event-stream');
-
         $payload = [
             'model' => $model,
             'messages' => $messages,
             'enable-tools' => (bool) config('ask-biigle.llm_enable_tools'),
             'temperature' => (float) config('ask-biigle.llm_temperature'),
             'top_p' => (float) config('ask-biigle.llm_top_p'),
+            'stream' => true,
         ];
-
-        if ($shouldStream) {
-            $payload['stream'] = true;
-        }
 
         $arcanaId = config('ask-biigle.llm_arcana_id');
         if (!empty($arcanaId)) {
@@ -100,7 +96,7 @@ class ChatController extends Controller
         $timeout = (int) config('ask-biigle.llm_timeout', 120);
 
         try {
-            $response = $this->sendUpstreamRequest($apiUrl, $apiKey, $payload, $timeout, $shouldStream);
+            $response = $this->sendUpstreamRequest($apiUrl, $apiKey, $payload, $timeout);
         } catch (ConnectionException $e) {
             Log::warning('AskBiigle upstream connection failed: '.$e->getMessage());
 
@@ -128,17 +124,7 @@ class ChatController extends Controller
             return $this->upstreamErrorResponse($response);
         }
 
-        if ($shouldStream) {
-            return $this->streamAssistantResponse($response);
-        }
-
-        $content = data_get($response->json(), 'choices.0.message.content');
-        $rawContent = $this->normalizeNewlines($this->flattenContent($content));
-
-        return response()->json([
-            'assistant' => $this->cleanAssistantContent($rawContent),
-            'sources' => $this->extractSources($rawContent),
-        ]);
+        return $this->streamAssistantResponse($response);
     }
 
     /**
@@ -152,17 +138,16 @@ class ChatController extends Controller
      * @param string $apiKey
      * @param array $payload
      * @param int $timeout
-     * @param bool $stream
      * @return ClientResponse
      * @throws ConnectionException
      */
-    protected function sendUpstreamRequest($apiUrl, $apiKey, array $payload, $timeout, $stream)
+    protected function sendUpstreamRequest($apiUrl, $apiKey, array $payload, $timeout)
     {
         $response = null;
 
         for ($attempt = 1; $attempt <= self::MAX_TRIES; $attempt++) {
             try {
-                $response = $this->newUpstreamRequest($apiKey, $timeout, $stream)
+                $response = $this->newUpstreamRequest($apiKey, $timeout)
                     ->post($apiUrl, $payload);
             } catch (ConnectionException $e) {
                 if ($attempt < self::MAX_TRIES) {
@@ -190,38 +175,18 @@ class ChatController extends Controller
      *
      * @param string $apiKey
      * @param int $timeout
-     * @param bool $stream
      * @return PendingRequest
      */
-    protected function newUpstreamRequest($apiKey, $timeout, $stream)
+    protected function newUpstreamRequest($apiKey, $timeout)
     {
-        $request = Http::timeout($timeout)
+        return Http::timeout($timeout)
             ->withToken($apiKey)
             ->withHeaders([
                 'inference-service' => config('ask-biigle.llm_inference_service'),
-            ]);
-
-        if (!$stream) {
-            return $request->acceptJson();
-        }
-
-        $request = $request
-            ->withHeaders(['Accept' => 'text/event-stream'])
-            ->withOptions(['stream' => true]);
-
-        // Guzzle only streams the response body if it uses the PHP stream
-        // handler, which in turn requires allow_url_fopen. Its default cURL
-        // handler buffers the whole body before it returns, which would defeat
-        // the purpose of this endpoint. Also, the timeout of the cURL handler
-        // applies to the whole transfer instead of a single read, so long
-        // answers would be truncated.
-        if (filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
-            return $request->setHandler(new StreamHandler);
-        }
-
-        Log::warning('AskBiigle cannot stream the response token by token because allow_url_fopen is disabled.');
-
-        return $request;
+                'Accept' => 'text/event-stream',
+            ])
+            ->withOptions(['stream' => true])
+            ->setHandler(new StreamHandler);
     }
 
     /**
@@ -288,8 +253,10 @@ class ChatController extends Controller
      * Relay the upstream event stream to the browser.
      *
      * Upstream chunks are normalized so the browser only has to handle the
-     * events of this endpoint. The complete answer is cleaned once the stream
-     * is finished, which is also where the retrieval sources are extracted.
+     * events of this endpoint. Tokens are collected and sent line by line, as one
+     * event per token would add a lot of overhead. The complete answer is cleaned
+     * once the stream is finished, which is also where the retrieval sources are
+     * extracted.
      *
      * @param ClientResponse $response
      * @return \Symfony\Component\HttpFoundation\StreamedResponse
@@ -304,6 +271,7 @@ class ChatController extends Controller
 
             $body = $response->toPsrResponse()->getBody();
             $content = '';
+            $pending = '';
 
             try {
                 while (!$body->eof() && !connection_aborted()) {
@@ -323,13 +291,30 @@ class ChatController extends Controller
                     }
 
                     $content .= $delta;
-                    $this->sendEvent(['type' => 'delta', 'content' => $delta]);
+                    $pending .= $delta;
+
+                    // Send everything up to the last complete line and keep the
+                    // rest until the line is finished.
+                    $lineBreak = strrpos($pending, "\n");
+                    if ($lineBreak !== false) {
+                        $this->sendEvent([
+                            'type' => 'delta',
+                            'content' => substr($pending, 0, $lineBreak + 1),
+                        ]);
+                        $pending = substr($pending, $lineBreak + 1);
+                    }
                 }
+
+                if ($pending !== '') {
+                    $this->sendEvent(['type' => 'delta', 'content' => $pending]);
+                }
+
+                $content = $this->normalizeNewlines($content);
 
                 $this->sendEvent([
                     'type' => 'done',
-                    'assistant' => $this->cleanAssistantContent($this->normalizeNewlines($content)),
-                    'sources' => $this->extractSources($this->normalizeNewlines($content)),
+                    'assistant' => $this->cleanAssistantContent($content),
+                    'sources' => $this->extractSources($content),
                 ]);
             } catch (\Throwable $e) {
                 Log::error('AskBiigle stream failed: '.$e->getMessage());

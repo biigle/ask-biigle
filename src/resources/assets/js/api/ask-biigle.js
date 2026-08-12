@@ -64,7 +64,7 @@ const processChunk = function (chunk, onDelta) {
 };
 
 /**
- * Send a chat message and receive the answer token by token.
+ * Send a chat message and receive the answer line by line.
  *
  * onDelta is called with each new piece of text. onDone is called once with the
  * cleaned answer and the retrieval sources.
@@ -78,11 +78,12 @@ api.chatStream = async function (data, onDelta, onDone, options = {}) {
         signal: options.signal,
         headers: {
             'Content-Type': 'application/json',
+            // Errors are still returned as JSON, so both content types are accepted.
             'Accept': 'text/event-stream, application/json',
             'X-CSRF-TOKEN': metaContent('csrf-token') || '',
             'X-Requested-With': 'XMLHttpRequest',
         },
-        body: JSON.stringify({...data, stream: true}),
+        body: JSON.stringify(data),
     });
 
     const contentType = response.headers.get('content-type') || '';
@@ -102,20 +103,6 @@ api.chatStream = async function (data, onDelta, onDone, options = {}) {
         error.status = response.status;
         error.data = errorData;
         throw error;
-    }
-
-    // The endpoint falls back to a plain JSON response if streaming is not
-    // available.
-    if (!contentType.includes('text/event-stream')) {
-        const body = await response.json();
-        if (typeof onDone === 'function') {
-            onDone({
-                assistant: body.assistant,
-                sources: Array.isArray(body.sources) ? body.sources : [],
-            });
-        }
-
-        return;
     }
 
     const reader = response.body.getReader();

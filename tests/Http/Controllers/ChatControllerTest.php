@@ -41,11 +41,10 @@ class ChatControllerTest extends TestCase
         $this->configureBot();
 
         Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [
-                    ['message' => ['content' => "Answer text.\n\nReferences:\n[RREF1] source-a.md (0.999) Example source snippet."]],
-                ],
-            ], 200),
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "Answer text.\n\nReferences:\n",
+                '[RREF1] source-a.md (0.999) Example source snippet.',
+            ]),
         ]);
 
         $response = $this->json('POST', 'ask-biigle/chat', [
@@ -55,14 +54,16 @@ class ChatControllerTest extends TestCase
             ],
         ]);
 
-        $response->assertStatus(200)
-            ->assertJsonStructure([
-                'assistant',
-                'sources',
-            ]);
+        $response->assertStatus(200);
+        $this->assertStringStartsWith('text/event-stream', $response->headers->get('Content-Type'));
 
-        $this->assertIsString($response->json('assistant'));
-        $this->assertIsArray($response->json('sources'));
+        $done = $this->doneEvent($response->streamedContent());
+
+        $this->assertIsString($done['assistant']);
+        $this->assertIsArray($done['sources']);
+
+        // The upstream response is always requested as a stream.
+        Http::assertSent(fn ($request) => $request['stream'] === true);
     }
 
     public function testUpstreamFailure()
@@ -113,23 +114,23 @@ class ChatControllerTest extends TestCase
         $this->configureBot();
 
         Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [
-                    ['message' => ['content' => "Result with marker [RREF1].\n\nReferences:\n[RREF1] 22.html.md (0.521) First source text.\n[RREF2] 9.html.md (0.523) Second source text."]],
-                ],
-            ], 200),
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "Result with marker [RREF1].\n\nReferences:\n",
+                "[RREF1] 22.html.md (0.521) First source text.\n",
+                '[RREF2] 9.html.md (0.523) Second source text.',
+            ]),
         ]);
 
         $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
         $response->assertStatus(200);
 
-        $assistant = $response->json('assistant');
-        $this->assertStringNotContainsString('[RREF1]', $assistant);
-        $this->assertStringNotContainsString('References:', $assistant);
+        $done = $this->doneEvent($response->streamedContent());
 
-        $sources = $response->json('sources');
-        $this->assertCount(2, $sources);
-        $this->assertSame('RREF1', $sources[0]['id']);
+        $this->assertStringNotContainsString('[RREF1]', $done['assistant']);
+        $this->assertStringNotContainsString('References:', $done['assistant']);
+
+        $this->assertCount(2, $done['sources']);
+        $this->assertSame('RREF1', $done['sources'][0]['id']);
     }
 
     public function testEscapedNewlines()
@@ -139,19 +140,19 @@ class ChatControllerTest extends TestCase
         $this->configureBot();
 
         Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [
-                    // Single quotes, so the content contains literal "\n" sequences.
-                    ['message' => ['content' => 'First line.\nSecond line.\n\nReferences:\n[RREF1] 22.html.md (0.521) First source text.']],
-                ],
-            ], 200),
+            // Single quotes, so the content contains literal "\n" sequences.
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                'First line.\nSecond line.\n\nReferences:\n[RREF1] 22.html.md (0.521) First source text.',
+            ]),
         ]);
 
         $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
         $response->assertStatus(200);
 
-        $this->assertSame("First line.\nSecond line.", $response->json('assistant'));
-        $this->assertCount(1, $response->json('sources'));
+        $done = $this->doneEvent($response->streamedContent());
+
+        $this->assertSame("First line.\nSecond line.", $done['assistant']);
+        $this->assertCount(1, $done['sources']);
     }
 
     public function testEscapedNewlinesKeepsRealNewlines()
@@ -161,17 +162,17 @@ class ChatControllerTest extends TestCase
         $this->configureBot();
 
         Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [
-                    ['message' => ['content' => "Use the pattern `a\\nb` here.\n\nDone."]],
-                ],
-            ], 200),
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "Use the pattern `a\\nb` here.\n\nDone.",
+            ]),
         ]);
 
         $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
         $response->assertStatus(200);
 
-        $this->assertSame("Use the pattern `a\\nb` here.\n\nDone.", $response->json('assistant'));
+        $done = $this->doneEvent($response->streamedContent());
+
+        $this->assertSame("Use the pattern `a\\nb` here.\n\nDone.", $done['assistant']);
     }
 
     public function testStreamedResponse()
@@ -180,33 +181,31 @@ class ChatControllerTest extends TestCase
         $this->be($user);
         $this->configureBot();
 
-        $ssePayload = "data: {\"choices\":[{\"delta\":{\"content\":\"Hello \"}}]}\n\n"
-            ."data: {\"choices\":[{\"delta\":{\"content\":\"world [RREF1] [RREF2].\\n\\nReferences:\\n[RREF1] doc.md (0.95) Snippet text.\\n[RREF2] other.md (0.51) Second snippet.\"}}]}\n\n"
-            ."data: [DONE]\n\n";
-
         Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response($ssePayload, 200, [
-                'Content-Type' => 'text/event-stream',
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                'Hello ',
+                "world [RREF1] [RREF2].\n",
+                "\nReferences:\n[RREF1] doc.md (0.95) Snippet text.\n",
+                '[RREF2] other.md (0.51) Second snippet.',
             ]),
         ]);
 
-        $response = $this->json('POST', 'ask-biigle/chat', [
-            'message' => 'Hello',
-            'stream' => true,
-        ]);
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
 
         $response->assertStatus(200);
         $this->assertStringStartsWith('text/event-stream', $response->headers->get('Content-Type'));
 
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString('data: {"type":"delta","content":"Hello "}', $content);
+        // Tokens are collected and sent line by line instead of one by one.
+        $this->assertStringContainsString('data: {"type":"delta","content":"Hello world [RREF1] [RREF2].\n"}', $content);
         $this->assertStringContainsString('"type":"done"', $content);
         // Every marker is stripped, not just the first one.
         $this->assertStringContainsString('"assistant":"Hello world."', $content);
         $this->assertStringContainsString('"id":"RREF1"', $content);
         $this->assertStringContainsString('"id":"RREF2"', $content);
         $this->assertStringEndsWith("data: [DONE]\n\n", $content);
+        $this->assertSame(3, substr_count($content, '"type":"delta"'));
     }
 
     public function testStreamedResponseUpstreamFailure()
@@ -223,49 +222,45 @@ class ChatControllerTest extends TestCase
 
         // Failures that happen before the first token are reported with a
         // proper status code instead of an event stream.
-        $this->json('POST', 'ask-biigle/chat', [
-            'message' => 'Hello',
-            'stream' => true,
-        ])->assertStatus(400)->assertJsonStructure(['message']);
-    }
-
-    public function testStreamNegotiationDefaultsToJson()
-    {
-        $user = UserTest::create();
-        $this->be($user);
-        $this->configureBot();
-
-        Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [['message' => ['content' => 'Answer text.']]],
-            ], 200),
-        ]);
-
         $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
-            ->assertStatus(200)
-            ->assertJson(['assistant' => 'Answer text.']);
-
-        Http::assertSent(fn ($request) => !array_key_exists('stream', $request->data()));
+            ->assertStatus(400)
+            ->assertJsonStructure(['message']);
     }
 
-    public function testStreamNegotiationHonorsFalse()
+    /**
+     * Build a fake upstream event stream from the given content chunks.
+     */
+    protected function fakeStream(array $deltas)
     {
-        $user = UserTest::create();
-        $this->be($user);
-        $this->configureBot();
+        $payload = '';
+        foreach ($deltas as $delta) {
+            $payload .= 'data: '.json_encode([
+                'choices' => [['delta' => ['content' => $delta]]],
+            ])."\n\n";
+        }
 
-        Http::fake([
-            'https://chat-ai.academiccloud.de/*' => Http::response([
-                'choices' => [['message' => ['content' => 'Answer text.']]],
-            ], 200),
+        return Http::response($payload."data: [DONE]\n\n", 200, [
+            'Content-Type' => 'text/event-stream',
         ]);
+    }
 
-        $response = $this->json('POST', 'ask-biigle/chat', [
-            'message' => 'Hello',
-            'stream' => false,
-        ], ['Accept' => 'text/event-stream']);
+    /**
+     * Extract the "done" event of a streamed response.
+     */
+    protected function doneEvent($content)
+    {
+        foreach (explode("\n", $content) as $line) {
+            if (!str_starts_with($line, 'data: ')) {
+                continue;
+            }
 
-        $response->assertStatus(200)->assertJson(['assistant' => 'Answer text.']);
+            $event = json_decode(substr($line, 6), true);
+            if (is_array($event) && ($event['type'] ?? null) === 'done') {
+                return $event;
+            }
+        }
+
+        $this->fail('The response did not contain a "done" event.');
     }
 
     protected function configureBot()
