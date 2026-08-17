@@ -23,7 +23,7 @@
                 ref="messages"
                 class="panel-body ask-biigle-messages"
                 :class="{'ask-biigle-messages--shadow-top': showTopShadow, 'ask-biigle-messages--shadow-bottom': showBottomShadow}"
-                @scroll="updateScrollShadows"
+                @scroll="handleScroll"
                 >
                 <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
                     Ask anything about using BIIGLE.
@@ -206,6 +206,8 @@ export default {
             abortController: null,
             showTopShadow: false,
             showBottomShadow: false,
+            pinnedMessageIndex: null,
+            pinnedScrollTop: null,
         };
     },
     computed: {
@@ -268,6 +270,42 @@ export default {
                 }
                 this.updateScrollShadows();
             });
+        },
+        // Keep the question at the top of the visible area instead of following the
+        // growing answer at the bottom. As long as the answer is shorter than the visible
+        // area this scrolls to the bottom, so the pin has to be applied on every update
+        // until the answer is long enough to actually reach the top.
+        scrollPinnedMessageToTop() {
+            this.$nextTick(() => {
+                const container = this.$refs.messages;
+                if (!container || this.pinnedMessageIndex === null) {
+                    this.updateScrollShadows();
+
+                    return;
+                }
+
+                const row = container.querySelectorAll('.ask-biigle-row')[this.pinnedMessageIndex];
+                if (row) {
+                    container.scrollTop += row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+                    this.pinnedScrollTop = container.scrollTop;
+                }
+
+                this.updateScrollShadows();
+            });
+        },
+        handleScroll() {
+            const el = this.$refs.messages;
+            // Stop pinning as soon as the user scrolls somewhere else on their own.
+            if (el && this.pinnedMessageIndex !== null && this.pinnedScrollTop !== null
+                && Math.abs(el.scrollTop - this.pinnedScrollTop) > 1) {
+                this.unpinMessage();
+            }
+
+            this.updateScrollShadows();
+        },
+        unpinMessage() {
+            this.pinnedMessageIndex = null;
+            this.pinnedScrollTop = null;
         },
         updateScrollShadows() {
             const el = this.$refs.messages;
@@ -333,6 +371,7 @@ export default {
         clearChat() {
             this.messages = [];
             saveMessages(this.messages);
+            this.unpinMessage();
             this.showTopShadow = false;
             this.showBottomShadow = false;
         },
@@ -366,7 +405,10 @@ export default {
                 activeSourceId: null,
             });
             const assistantMsg = this.messages[this.messages.length - 1];
-            this.scrollToBottom();
+            // Pin the question so it stays in view while the answer is streamed below it.
+            this.pinnedMessageIndex = Math.max(this.messages.length - 2, 0);
+            this.pinnedScrollTop = null;
+            this.scrollPinnedMessageToTop();
 
             // Deltas arrive line by line but the whole message is rendered
             // anew on each update, so they are applied once per frame.
@@ -381,7 +423,7 @@ export default {
                 if (buffered) {
                     assistantMsg.content += buffered;
                     buffered = '';
-                    this.scrollToBottom();
+                    this.scrollPinnedMessageToTop();
                 }
             };
 
@@ -400,10 +442,11 @@ export default {
                         assistantMsg.content = doneEvent.assistant;
                     }
                     assistantMsg.sources = doneEvent.sources;
-                    this.scrollToBottom();
+                    this.scrollPinnedMessageToTop();
                 }, {signal: this.abortController.signal});
             } catch (error) {
                 flushBuffer();
+                this.unpinMessage();
                 const index = this.messages.indexOf(assistantMsg);
                 if (index !== -1) {
                     this.messages.splice(index, 1);
@@ -427,6 +470,8 @@ export default {
                 this.addMessage('error', errorMessage, [], message);
             } finally {
                 flushBuffer();
+                // Unpin only after the pending scroll of the last update was applied.
+                this.$nextTick(() => this.unpinMessage());
                 // The messages are stored only here and not on every update of the
                 // stream, as writing to localStorage is expensive.
                 saveMessages(this.messages);
@@ -486,6 +531,9 @@ export default {
     display: flex;
     flex-direction: column;
     height: 340px;
+    // Scroll anchoring would adjust scrollTop while the streamed answer grows, which
+    // fights the pin that keeps the top of the answer in view.
+    overflow-anchor: none;
     overflow-y: auto;
     padding: 12px;
 }
