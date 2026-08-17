@@ -28,3 +28,6 @@ After configuration, a new chat button appears in the BIIGLE navbar-right and op
 ### API Key
 
 To retrieve an API key (`ASK_BIIGLE_LLM_API_KEY`), please refer to the [GWDG SAIA API Request Documentation](https://docs.hpc.gwdg.de/services/ai-services/saia/index.html#api-request).
+
+## Arcana Update
+To update the arcana RAG system, execute `arcanaUpdate/rebuildRAG.py`. This script scrapes [https://biigle.de/manual](https://biigle.de/manual) and updates any modified files.
