@@ -1,6 +1,7 @@
 <template>
     <modal
         v-model="showModal"
+        class="ask-biigle-modal"
         size="lg"
         :footer="false"
         append-to-body
@@ -523,14 +524,55 @@ export default {
 <style lang="scss">
 @use "bootstrap/variables" as *;
 
+// The dialog fills the available space instead of using the fixed width of .modal-lg
+// and the fixed height of the message list, so the chat grows with the screen.
+.ask-biigle-modal {
+    --ask-biigle-modal-margin: 10px;
+
+    .modal-dialog {
+        margin: var(--ask-biigle-modal-margin) auto;
+        // Keep the lines readable instead of stretching them across a wide screen and
+        // always leave the margin free on the left and right.
+        max-width: calc(min(1200px, 100% - 2 * var(--ask-biigle-modal-margin)));
+        width: auto;
+    }
+
+    .modal-content {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 2 * var(--ask-biigle-modal-margin));
+    }
+
+    // min-height allows the flex items to shrink below their content height, which is
+    // required for the message list to scroll instead of overflowing the dialog.
+    .modal-body {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+    }
+}
+
+@media (min-width: $screen-sm-min) {
+
+    .ask-biigle-modal {
+        --ask-biigle-modal-margin: 30px;
+    }
+}
+
 .ask-biigle-chat {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     margin-bottom: 0;
+    min-height: 0;
 }
 
 .ask-biigle-messages {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
-    height: 340px;
+    min-height: 0;
     // Scroll anchoring would adjust scrollTop while the streamed answer grows, which
     // fights the pin that keeps the top of the answer in view.
     overflow-anchor: none;
