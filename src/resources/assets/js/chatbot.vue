@@ -23,7 +23,7 @@
                 ref="messages"
                 class="panel-body ask-biigle-messages"
                 :class="{'ask-biigle-messages--shadow-top': showTopShadow, 'ask-biigle-messages--shadow-bottom': showBottomShadow}"
-                @scroll="updateScrollShadows"
+                @scroll="handleScroll"
                 >
                 <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
                     Ask anything about using BIIGLE.
@@ -36,7 +36,12 @@
                     >
                     <div class="ask-biigle-bubble">
                         <div class="ask-biigle-bubble__role">{{ roleLabel(message.role) }}</div>
-                        <div class="ask-biigle-bubble__content" v-html="renderMessageHtml(message)"></div>
+                        <div v-if="message.role === 'assistant' && !message.content" class="ask-biigle-typing-indicator">
+                            <span class="ask-biigle-typing-dot"></span>
+                            <span class="ask-biigle-typing-dot"></span>
+                            <span class="ask-biigle-typing-dot"></span>
+                        </div>
+                        <div v-else class="ask-biigle-bubble__content" v-html="renderMessageHtml(message)"></div>
                         <button
                             v-if="message.role === 'error'"
                             type="button"
@@ -90,16 +95,6 @@
                         </div>
                     </div>
                 </div>
-                <div v-if="pending" class="ask-biigle-row ask-biigle-row--assistant">
-                    <div class="ask-biigle-bubble">
-                        <div class="ask-biigle-bubble__role">BIIGLE</div>
-                        <div class="ask-biigle-typing-indicator">
-                            <span class="ask-biigle-typing-dot"></span>
-                            <span class="ask-biigle-typing-dot"></span>
-                            <span class="ask-biigle-typing-dot"></span>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="panel-footer ask-biigle-footer">
                 <textarea
@@ -141,6 +136,18 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
         node.setAttribute('rel', 'noopener noreferrer');
     }
 });
+
+// Mirrors cleanAssistantContent() of the ChatController. The backend sends the
+// cleaned answer only once the stream is finished, so the markers have to be
+// hidden while the answer is still streaming in.
+function stripReferences(value) {
+    return value
+        .replace(/\n?-{3,}\s*References?:[\s\S]*$/i, '')
+        .replace(/\s*References?:\s*\[[A-Z]*REF\d+\][\s\S]*$/i, '')
+        .replace(/\s*\[(?:RREF|REF)\d+\]/gi, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
 
 marked.use({
     gfm: true,
@@ -196,8 +203,11 @@ export default {
             pending: false,
             messages: loadMessages(),
             openHandler: null,
+            abortController: null,
             showTopShadow: false,
             showBottomShadow: false,
+            pinnedMessageIndex: null,
+            pinnedScrollTop: null,
         };
     },
     computed: {
@@ -206,7 +216,7 @@ export default {
         },
         requestHistory() {
             return this.messages
-                .filter((message) => message.role === 'user' || message.role === 'assistant')
+                .filter((message) => (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string' && message.content.trim().length > 0)
                 .slice(-MAX_HISTORY_ITEMS)
                 .map((message) => ({
                     role: message.role,
@@ -215,13 +225,12 @@ export default {
         },
     },
     watch: {
-        messages: {
-            deep: true,
-            handler(newMessages) {
-                saveMessages(newMessages);
-            },
-        },
         showModal(show) {
+            if (!show) {
+                // Don't keep a pending answer running in the background.
+                this.abortRequest();
+            }
+
             try {
                 const Keyboard = biigle.$require('keyboard');
                 if (Keyboard && typeof Keyboard.disable === 'function') {
@@ -262,6 +271,42 @@ export default {
                 this.updateScrollShadows();
             });
         },
+        // Keep the question at the top of the visible area instead of following the
+        // growing answer at the bottom. As long as the answer is shorter than the visible
+        // area this scrolls to the bottom, so the pin has to be applied on every update
+        // until the answer is long enough to actually reach the top.
+        scrollPinnedMessageToTop() {
+            this.$nextTick(() => {
+                const container = this.$refs.messages;
+                if (!container || this.pinnedMessageIndex === null) {
+                    this.updateScrollShadows();
+
+                    return;
+                }
+
+                const row = container.querySelectorAll('.ask-biigle-row')[this.pinnedMessageIndex];
+                if (row) {
+                    container.scrollTop += row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+                    this.pinnedScrollTop = container.scrollTop;
+                }
+
+                this.updateScrollShadows();
+            });
+        },
+        handleScroll() {
+            const el = this.$refs.messages;
+            // Stop pinning as soon as the user scrolls somewhere else on their own.
+            if (el && this.pinnedMessageIndex !== null && this.pinnedScrollTop !== null
+                && Math.abs(el.scrollTop - this.pinnedScrollTop) > 1) {
+                this.unpinMessage();
+            }
+
+            this.updateScrollShadows();
+        },
+        unpinMessage() {
+            this.pinnedMessageIndex = null;
+            this.pinnedScrollTop = null;
+        },
         updateScrollShadows() {
             const el = this.$refs.messages;
             if (!el) {
@@ -280,6 +325,7 @@ export default {
                 activeSourceId: null,
                 failedUserMessage,
             });
+            saveMessages(this.messages);
             this.scrollToBottom();
         },
         toggleSources(index) {
@@ -316,10 +362,16 @@ export default {
                 return `<p>${message.content}</p>`;
             }
 
-            return DOMPurify.sanitize(marked.parse(message.content));
+            const content = message.role === 'assistant'
+                ? stripReferences(message.content)
+                : message.content;
+
+            return DOMPurify.sanitize(marked.parse(content));
         },
         clearChat() {
             this.messages = [];
+            saveMessages(this.messages);
+            this.unpinMessage();
             this.showTopShadow = false;
             this.showBottomShadow = false;
         },
@@ -343,33 +395,94 @@ export default {
         },
         async doSend(message) {
             this.pending = true;
+            this.abortController = new AbortController();
+
+            this.messages.push({
+                role: 'assistant',
+                content: '',
+                sources: [],
+                sourcesExpanded: false,
+                activeSourceId: null,
+            });
+            const assistantMsg = this.messages[this.messages.length - 1];
+            // Pin the question so it stays in view while the answer is streamed below it.
+            this.pinnedMessageIndex = Math.max(this.messages.length - 2, 0);
+            this.pinnedScrollTop = null;
+            this.scrollPinnedMessageToTop();
+
+            // Deltas arrive line by line but the whole message is rendered
+            // anew on each update, so they are applied once per frame.
+            let buffered = '';
+            let frame = null;
+            const flushBuffer = () => {
+                if (frame !== null) {
+                    window.cancelAnimationFrame(frame);
+                    frame = null;
+                }
+
+                if (buffered) {
+                    assistantMsg.content += buffered;
+                    buffered = '';
+                    this.scrollPinnedMessageToTop();
+                }
+            };
 
             try {
-                const response = await AskBiigleApi.save({}, {
+                await AskBiigleApi.chatStream({
                     message,
                     history: this.requestHistory,
-                });
+                }, (content) => {
+                    buffered += content;
+                    if (frame === null) {
+                        frame = window.requestAnimationFrame(flushBuffer);
+                    }
+                }, (doneEvent) => {
+                    flushBuffer();
+                    if (typeof doneEvent.assistant === 'string') {
+                        assistantMsg.content = doneEvent.assistant;
+                    }
+                    assistantMsg.sources = doneEvent.sources;
+                    this.scrollPinnedMessageToTop();
+                }, {signal: this.abortController.signal});
+            } catch (error) {
+                flushBuffer();
+                this.unpinMessage();
+                const index = this.messages.indexOf(assistantMsg);
+                if (index !== -1) {
+                    this.messages.splice(index, 1);
+                }
 
-                const data = response.body;
-                this.addMessage(
-                    'assistant',
-                    data && data.assistant ? data.assistant : '',
-                    data && Array.isArray(data.sources) ? data.sources : []
-                );
-            } catch (response) {
-                const data = response && response.body;
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+
+                const data = error && error.data;
                 let errorMessage = 'Request failed.';
                 if (data && typeof data.message === 'string' && data.message.length > 0) {
                     errorMessage = data.message;
-                } else if (response && response.status === 504) {
+                } else if (error && typeof error.message === 'string' && error.message.length > 0) {
+                    errorMessage = error.message;
+                } else if (error && error.status === 504) {
                     errorMessage = 'The AI service timed out. Click Retry to try again.';
-                } else if (response && response.status === 500) {
+                } else if (error && error.status === 500) {
                     errorMessage = 'AskBiigle server error. Click Retry to try again.';
                 }
                 this.addMessage('error', errorMessage, [], message);
             } finally {
+                flushBuffer();
+                // Unpin only after the pending scroll of the last update was applied.
+                this.$nextTick(() => this.unpinMessage());
+                // The messages are stored only here and not on every update of the
+                // stream, as writing to localStorage is expensive.
+                saveMessages(this.messages);
+                this.abortController = null;
                 this.pending = false;
                 this.focusInput();
+            }
+        },
+        abortRequest() {
+            if (this.abortController) {
+                this.abortController.abort();
             }
         },
         retryMessage(errorIndex) {
@@ -399,6 +512,7 @@ export default {
         window.addEventListener('ask-biigle:open', this.openHandler);
     },
     beforeUnmount() {
+        this.abortRequest();
         if (this.openHandler) {
             window.removeEventListener('ask-biigle:open', this.openHandler);
         }
@@ -417,6 +531,9 @@ export default {
     display: flex;
     flex-direction: column;
     height: 340px;
+    // Scroll anchoring would adjust scrollTop while the streamed answer grows, which
+    // fights the pin that keeps the top of the answer in view.
+    overflow-anchor: none;
     overflow-y: auto;
     padding: 12px;
 }

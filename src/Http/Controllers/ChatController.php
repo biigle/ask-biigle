@@ -3,20 +3,35 @@
 namespace Biigle\Modules\AskBiigle\Http\Controllers;
 
 use Biigle\Http\Controllers\Views\Controller;
+use GuzzleHttp\Handler\StreamHandler;
+use GuzzleHttp\Psr7\Utils;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class ChatController extends Controller
 {
     /**
+     * Number of attempts for the upstream request.
+     *
+     * @var int
+     */
+    const MAX_TRIES = 3;
+
+    /**
      * Forward a user message to the configured OpenAI-compatible backend.
      *
      * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\StreamedResponse
      * @throws ValidationException
+     * @throws RuntimeException
      */
     public function chat(Request $request)
     {
@@ -34,6 +49,15 @@ class ChatController extends Controller
             throw ValidationException::withMessages([
                 'message' => ['AskBiigle is not configured. Please set ASK_BIIGLE_LLM_API_URL, ASK_BIIGLE_LLM_API_KEY and ASK_BIIGLE_LLM_ALGORITHM.'],
             ]);
+        }
+
+        // Guzzle only streams the response body if it uses the PHP stream handler,
+        // which in turn requires allow_url_fopen. Its default cURL handler buffers the
+        // whole body before it returns, which would defeat the purpose of this
+        // endpoint. Also, the timeout of the cURL handler applies to the whole transfer
+        // instead of a single read, so long answers would be truncated.
+        if (!filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
+            throw new RuntimeException('AskBiigle cannot stream the chat response because allow_url_fopen is disabled.');
         }
 
         $messages = [
@@ -61,6 +85,7 @@ class ChatController extends Controller
             'enable-tools' => (bool) config('ask-biigle.llm_enable_tools'),
             'temperature' => (float) config('ask-biigle.llm_temperature'),
             'top_p' => (float) config('ask-biigle.llm_top_p'),
+            'stream' => true,
         ];
 
         $arcanaId = config('ask-biigle.llm_arcana_id');
@@ -68,77 +93,301 @@ class ChatController extends Controller
             $payload['arcana'] = ['id' => $arcanaId];
         }
 
-        $maxTries = 3;
         $timeout = (int) config('ask-biigle.llm_timeout', 120);
-        $response = null;
 
-        for ($attempt = 1; $attempt <= $maxTries; $attempt++) {
-            try {
-                $response = Http::acceptJson()
-                    ->timeout($timeout)
-                    ->withToken($apiKey)
-                    ->withHeaders([
-                        'inference-service' => config('ask-biigle.llm_inference_service'),
-                    ])
-                    ->post($apiUrl, $payload);
-
-                if ($response->successful()) {
-                    break;
-                }
-
-                $details = $response->json();
-                $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
-
-                if ($attempt < $maxTries && ($response->status() >= 500 || $errMsg === 'ReadTimeout')) {
-                    Sleep::for(1)->second();
-                    continue;
-                }
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
-                if ($attempt < $maxTries) {
-                    Sleep::for(1)->second();
-                    continue;
-                }
-
-                return response()->json([
-                    'message' => 'The AI service connection timed out. Please click Retry to try again.',
-                    'details' => [
-                        'type' => 'error',
-                        'status' => 504,
-                        'message' => 'ReadTimeout',
-                    ],
-                ], 504);
-            } catch (\Throwable $e) {
-                return response()->json([
-                    'message' => 'AskBiigle request failed: '.$e->getMessage(),
-                    'details' => [
-                        'type' => 'error',
-                        'status' => 500,
-                        'message' => $e->getMessage(),
-                    ],
-                ], 500);
-            }
-        }
-
-        if (!$response || !$response->successful()) {
-            $details = $response ? $response->json() : null;
-            $errMsg = data_get($details, 'message') ?: data_get($details, 'details.message');
-
-            $message = 'AskBiigle request failed.';
-            if ($errMsg === 'ReadTimeout') {
-                $message = 'The upstream AI service (AcademicCloud) encountered a timeout. Please click Retry to try again.';
-            } elseif ($errMsg && (str_contains($errMsg, "'NoneType' object is not subscriptable") || str_contains($errMsg, 'Error generating output from arcana'))) {
-                $message = 'The documentation index is currently being regenerated. Please try again in a few minutes.';
-            } elseif ($errMsg) {
-                $message = 'AskBiigle request failed: '.$errMsg;
-            }
+        try {
+            $response = $this->sendUpstreamRequest($apiUrl, $apiKey, $payload, $timeout);
+        } catch (ConnectionException $e) {
+            Log::warning('AskBiigle upstream connection failed: '.$e->getMessage());
 
             return response()->json([
-                'message' => $message,
-                'details' => $details,
-            ], $response ? ($response->status() >= 400 && $response->status() < 600 ? $response->status() : 500) : 500);
+                'message' => 'The AI service connection timed out. Please click Retry to try again.',
+                'details' => [
+                    'type' => 'error',
+                    'status' => 504,
+                    'message' => 'ReadTimeout',
+                ],
+            ], 504);
+        } catch (\Throwable $e) {
+            Log::error('AskBiigle request failed: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'AskBiigle request failed. Please click Retry to try again.',
+                'details' => [
+                    'type' => 'error',
+                    'status' => 500,
+                ],
+            ], 500);
         }
 
-        $content = data_get($response->json(), 'choices.0.message.content');
+        if (!$response->successful()) {
+            return $this->upstreamErrorResponse($response);
+        }
+
+        return $this->streamAssistantResponse($response);
+    }
+
+    /**
+     * Perform the upstream request, retrying transient failures.
+     *
+     * The request is made before any response is returned to the browser so
+     * that failures which occur before the first token can still be reported
+     * with a proper HTTP status code instead of a half-open event stream.
+     *
+     * @param string $apiUrl
+     * @param string $apiKey
+     * @param array $payload
+     * @param int $timeout
+     * @return ClientResponse
+     * @throws ConnectionException
+     */
+    protected function sendUpstreamRequest($apiUrl, $apiKey, array $payload, $timeout)
+    {
+        $response = null;
+
+        for ($attempt = 1; $attempt <= self::MAX_TRIES; $attempt++) {
+            try {
+                $response = $this->newUpstreamRequest($apiKey, $timeout)
+                    ->post($apiUrl, $payload);
+            } catch (ConnectionException $e) {
+                if ($attempt < self::MAX_TRIES) {
+                    Sleep::for(1)->second();
+                    continue;
+                }
+
+                throw $e;
+            }
+
+            if ($response->successful() || !$this->shouldRetry($response)) {
+                return $response;
+            }
+
+            if ($attempt < self::MAX_TRIES) {
+                Sleep::for(1)->second();
+            }
+        }
+
+        return $response;
+    }
+
+    /**
+     * Configure a request to the upstream chat completion endpoint.
+     *
+     * @param string $apiKey
+     * @param int $timeout
+     * @return PendingRequest
+     */
+    protected function newUpstreamRequest($apiKey, $timeout)
+    {
+        return Http::timeout($timeout)
+            ->withToken($apiKey)
+            ->withHeaders([
+                'inference-service' => config('ask-biigle.llm_inference_service'),
+                'Accept' => 'text/event-stream',
+            ])
+            ->withOptions(['stream' => true])
+            ->setHandler(new StreamHandler);
+    }
+
+    /**
+     * Determine if an unsuccessful upstream response should be retried.
+     *
+     * @param ClientResponse $response
+     * @return bool
+     */
+    protected function shouldRetry(ClientResponse $response)
+    {
+        if ($response->status() >= 500) {
+            return true;
+        }
+
+        return $this->upstreamErrorMessage($response) === 'ReadTimeout';
+    }
+
+    /**
+     * Build the response for an unsuccessful upstream request.
+     *
+     * @param ClientResponse $response
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function upstreamErrorResponse(ClientResponse $response)
+    {
+        $errMsg = $this->upstreamErrorMessage($response);
+
+        $message = 'AskBiigle request failed.';
+        if ($errMsg === 'ReadTimeout') {
+            $message = 'The upstream AI service (AcademicCloud) encountered a timeout. Please click Retry to try again.';
+        } elseif ($errMsg && (str_contains($errMsg, "'NoneType' object is not subscriptable") || str_contains($errMsg, 'Error generating output from arcana'))) {
+            $message = 'The documentation index is currently being regenerated. Please try again in a few minutes.';
+        } elseif ($errMsg) {
+            $message = 'AskBiigle request failed: '.$errMsg;
+        }
+
+        $status = $response->status();
+        if ($status < 400 || $status >= 600) {
+            $status = 500;
+        }
+
+        return response()->json([
+            'message' => $message,
+            'details' => $response->json(),
+        ], $status);
+    }
+
+    /**
+     * Extract the error message of an unsuccessful upstream response.
+     *
+     * @param ClientResponse $response
+     * @return string|null
+     */
+    protected function upstreamErrorMessage(ClientResponse $response)
+    {
+        $details = $response->json();
+
+        $message = data_get($details, 'message')
+            ?: data_get($details, 'details.message')
+            ?: data_get($details, 'error.message');
+
+        return is_string($message) ? $message : null;
+    }
+
+    /**
+     * Relay the upstream event stream to the browser.
+     *
+     * Upstream chunks are normalized so the browser only has to handle the
+     * events of this endpoint. Tokens are collected and sent line by line, as one
+     * event per token would add a lot of overhead. The complete answer is cleaned
+     * once the stream is finished, which is also where the retrieval sources are
+     * extracted.
+     *
+     * @param ClientResponse $response
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    protected function streamAssistantResponse(ClientResponse $response)
+    {
+        return response()->stream(function () use ($response) {
+            // Send each frame as soon as it is produced. Output buffers that
+            // belong to the caller (e.g. the test harness) are flushed but must
+            // not be closed here.
+            ob_implicit_flush(true);
+
+            $body = $response->toPsrResponse()->getBody();
+            $content = '';
+            $pending = '';
+
+            try {
+                while (!$body->eof() && !connection_aborted()) {
+                    $line = rtrim(Utils::readLine($body), "\r\n");
+                    if (!str_starts_with($line, 'data:')) {
+                        continue;
+                    }
+
+                    $data = trim(substr($line, 5));
+                    if ($data === '' || $data === '[DONE]') {
+                        continue;
+                    }
+
+                    $delta = $this->extractDelta(json_decode($data, true));
+                    if ($delta === '') {
+                        continue;
+                    }
+
+                    $content .= $delta;
+                    $pending .= $delta;
+
+                    // Send everything up to the last complete line and keep the
+                    // rest until the line is finished.
+                    $lineBreak = strrpos($pending, "\n");
+                    if ($lineBreak !== false) {
+                        $this->sendEvent([
+                            'type' => 'delta',
+                            'content' => substr($pending, 0, $lineBreak + 1),
+                        ]);
+                        $pending = substr($pending, $lineBreak + 1);
+                    }
+                }
+
+                if ($pending !== '') {
+                    $this->sendEvent(['type' => 'delta', 'content' => $pending]);
+                }
+
+                $content = $this->normalizeNewlines($content);
+
+                $this->sendEvent([
+                    'type' => 'done',
+                    'assistant' => $this->cleanAssistantContent($content),
+                    'sources' => $this->extractSources($content),
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('AskBiigle stream failed: '.$e->getMessage());
+                $this->sendEvent([
+                    'type' => 'error',
+                    'message' => 'The AI service encountered an issue. Please click Retry to try again.',
+                ]);
+            } finally {
+                $body->close();
+            }
+
+            echo "data: [DONE]\n\n";
+            $this->flushOutput();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Send a single server sent event.
+     *
+     * @param array $event
+     */
+    protected function sendEvent(array $event)
+    {
+        echo 'data: '.json_encode($event)."\n\n";
+        $this->flushOutput();
+    }
+
+    /**
+     * Push the buffered output to the browser.
+     */
+    protected function flushOutput()
+    {
+        if (ob_get_level() > 0) {
+            @ob_flush();
+        }
+
+        flush();
+    }
+
+    /**
+     * Extract the new content of a single upstream chunk.
+     *
+     * @param mixed $event
+     * @return string
+     */
+    protected function extractDelta($event)
+    {
+        if (!is_array($event)) {
+            return '';
+        }
+
+        $content = data_get($event, 'choices.0.delta.content');
+        if (is_null($content)) {
+            $content = data_get($event, 'choices.0.message.content');
+        }
+
+        return $this->flattenContent($content);
+    }
+
+    /**
+     * Reduce structured message content to plain text.
+     *
+     * @param mixed $content
+     * @return string
+     */
+    protected function flattenContent($content)
+    {
         if (is_array($content)) {
             $content = collect($content)
                 ->where('type', 'text')
@@ -146,12 +395,7 @@ class ChatController extends Controller
                 ->implode("\n");
         }
 
-        $rawContent = $this->normalizeNewlines((string) ($content ?? ''));
-
-        return response()->json([
-            'assistant' => $this->cleanAssistantContent($rawContent),
-            'sources' => $this->extractSources($rawContent),
-        ]);
+        return (string) ($content ?? '');
     }
 
     /**
