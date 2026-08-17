@@ -87,6 +87,25 @@ class ChatControllerTest extends TestCase
         Sleep::assertSleptTimes(2);
     }
 
+    public function testArcanaIndexingError()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => Http::response([
+                'message' => "Error generating output from arcana d.langenkaemper/BiigleManual 'NoneType' object is not subscriptable.",
+            ], 500),
+        ]);
+
+        $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello'])
+            ->assertStatus(500)
+            ->assertJsonFragment([
+                'message' => 'The documentation index is currently being regenerated. Please try again in a few minutes.',
+            ]);
+    }
+
     public function testHistoryTooLong()
     {
         $user = UserTest::create();
