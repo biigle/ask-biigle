@@ -94,6 +94,16 @@
                                 </div>
                             </div>
                         </div>
+                        <button
+                            v-if="message.role === 'assistant' && message.content"
+                            type="button"
+                            class="btn btn-link btn-xs ask-biigle-report-btn"
+                            title="Report this answer as incorrect by email"
+                            :disabled="pending"
+                            @click="reportMessage(index)"
+                            >
+                            <i class="fa fa-flag"></i> Report incorrect answer
+                        </button>
                     </div>
                 </div>
             </div>
@@ -127,6 +137,8 @@ import AskBiigleApi from './api/ask-biigle.js';
 
 const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
+const REPORT_EMAIL = 'info@biigle.de';
+const REPORT_SUBJECT = 'Ask BIIGLE: incorrect answer';
 
 // Open links in a new tab; rel="noopener noreferrer" prevents reverse tabnabbing.
 // This must happen in a hook because "target" is not in DOMPurify's default list of
@@ -162,6 +174,20 @@ marked.use({
         },
     },
 });
+
+// A mailto: link cannot carry an attachment, so the report text is offered as a file
+// download instead and the mail body asks the user to attach the downloaded file.
+function downloadTextFile(filename, content) {
+    const url = URL.createObjectURL(new Blob([content], {type: 'text/plain;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Revoking immediately would cancel a download that has not started yet.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
 const STORAGE_KEY = 'ask-biigle.messages';
 
@@ -486,6 +512,72 @@ export default {
                 this.abortController.abort();
             }
         },
+        // The question that the reported answer belongs to, for context in the report.
+        findQuestion(index) {
+            for (let i = index - 1; i >= 0; i--) {
+                if (this.messages[i].role === 'user') {
+                    return this.messages[i].content;
+                }
+            }
+
+            return '';
+        },
+        buildReportText(index) {
+            const message = this.messages[index];
+            const question = this.findQuestion(index);
+            const lines = [
+                'Ask BIIGLE - report of an incorrect answer',
+                '',
+                `Date: ${new Date().toISOString()}`,
+                `Page: ${window.location.href}`,
+                '',
+                'Question:',
+                question || '(unknown)',
+                '',
+                'Answer:',
+                stripReferences(message.content),
+            ];
+
+            if (message.sources.length > 0) {
+                lines.push('', 'Sources:');
+                message.sources.forEach((source) => {
+                    const score = typeof source.score === 'number' ? ` (score ${source.score.toFixed(3)})` : '';
+                    lines.push(`[${source.id}] ${source.title}${score}`);
+                    if (source.snippet) {
+                        lines.push(`    ${source.snippet}`);
+                    }
+                });
+            }
+
+            return lines.join('\n');
+        },
+        reportMessage(index) {
+            const message = this.messages[index];
+            if (!message || message.role !== 'assistant' || !message.content) {
+                return;
+            }
+
+            const filename = `ask-biigle-report-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+            downloadTextFile(filename, this.buildReportText(index));
+
+            const body = [
+                'Hello BIIGLE team,',
+                '',
+                'I would like to report an incorrect answer of the Ask BIIGLE assistant.',
+                '',
+                `The question, the answer and its sources were saved to the file "${filename}", which was just downloaded to this computer. Please attach that file to this email.`,
+                '',
+                'What is wrong with the answer:',
+                '',
+            ].join('\n');
+
+            const mailto = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(REPORT_SUBJECT)}&body=${encodeURIComponent(body)}`;
+            // Opening the mail client in the same tick can cancel the download in some
+            // browsers, so give the download a moment to start.
+            window.setTimeout(() => {
+                window.location.href = mailto;
+            }, 250);
+        },
         retryMessage(errorIndex) {
             const errorMsg = this.messages[errorIndex];
             if (!errorMsg || errorMsg.role !== 'error' || !errorMsg.failedUserMessage) {
@@ -629,6 +721,12 @@ export default {
 
 .ask-biigle-retry-btn {
     margin-top: 6px;
+}
+
+.ask-biigle-report-btn {
+    display: block;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .ask-biigle-bubble__role {
