@@ -42,6 +42,10 @@
                             <span class="ask-biigle-typing-dot"></span>
                             <span class="ask-biigle-typing-dot"></span>
                         </div>
+                        <div
+                            v-else-if="message.role === 'user'"
+                            class="ask-biigle-bubble__content"
+                            >{{ message.content }}</div>
                         <div v-else class="ask-biigle-bubble__content" v-html="renderMessageHtml(message)"></div>
                         <button
                             v-if="message.role === 'error'"
@@ -387,11 +391,6 @@ export default {
             });
         },
         renderMessageHtml(message) {
-            // User content is already sanitized in sendMessage().
-            if (message.role === 'user') {
-                return `<p>${message.content}</p>`;
-            }
-
             const content = message.role === 'assistant'
                 ? stripReferences(message.content)
                 : message.content;
@@ -416,9 +415,11 @@ export default {
                 return;
             }
 
-            // Sanitize here and not during rendering so the message that is displayed is
-            // identical to the one that is sent to the API (also as chat history).
-            const message = DOMPurify.sanitize(this.input.trim(), {ALLOWED_TAGS: []});
+            // Keep the raw text. Sanitizing here would strip anything that parses as a
+            // tag (e.g. "<image>") and escape "&" before the message is sent to the API.
+            // User content is rendered as text and never as HTML, so it needs no
+            // sanitizing.
+            const message = this.input.trim();
             this.input = '';
             this.addMessage('user', message);
             await this.doSend(message);
