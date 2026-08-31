@@ -227,6 +227,36 @@ class ChatControllerTest extends TestCase
         $this->assertSame(3, substr_count($content, '"type":"delta"'));
     }
 
+    public function testMultibyteSourceSnippet()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        // Source snippets are truncated at 220 characters. Here the 220th byte falls
+        // into the middle of the "ö", which used to leave the snippet with invalid
+        // UTF-8, so json_encode() failed and the "done" event was sent as an empty frame.
+        $snippet = str_repeat('a', 219).'ö'.str_repeat('b', 20);
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "Antwort über Größen.\n\nReferences:\n",
+                '[RREF1] doc.md (0.9) '.$snippet,
+            ]),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
+        $response->assertStatus(200);
+
+        $done = $this->doneEvent($response->streamedContent());
+
+        $this->assertSame("Antwort über Größen.", $done['assistant']);
+        $this->assertCount(1, $done['sources']);
+        $this->assertTrue(mb_check_encoding($done['sources'][0]['snippet'], 'UTF-8'));
+        // 220 characters plus the ellipsis.
+        $this->assertSame(223, mb_strlen($done['sources'][0]['snippet']));
+    }
+
     public function testStreamedResponseUpstreamFailure()
     {
         $user = UserTest::create();

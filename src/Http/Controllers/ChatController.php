@@ -344,7 +344,22 @@ class ChatController extends Controller
      */
     protected function sendEvent(array $event)
     {
-        echo 'data: '.json_encode($event)."\n\n";
+        $json = json_encode($event);
+
+        // An event that cannot be encoded would be sent as an empty frame, which the
+        // browser skips. For the "done" event this means the answer never completes,
+        // so replace the offending characters instead of dropping the event.
+        if ($json === false) {
+            $json = json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+
+        if ($json === false) {
+            Log::error('AskBiigle could not encode a chat event: '.json_last_error_msg());
+
+            return;
+        }
+
+        echo 'data: '.$json."\n\n";
         $this->flushOutput();
     }
 
@@ -469,8 +484,11 @@ class ChatController extends Controller
             }
 
             $snippet = trim(preg_replace('/\s+/', ' ', strip_tags($snippet)));
-            if (strlen($snippet) > 220) {
-                $snippet = substr($snippet, 0, 220).'...';
+            // Truncate by characters and not by bytes. A byte offset can fall into the
+            // middle of a multi-byte character, which would leave the snippet with
+            // invalid UTF-8 and make json_encode() fail for the whole event.
+            if (mb_strlen($snippet) > 220) {
+                $snippet = mb_substr($snippet, 0, 220).'...';
             }
 
             $sources[] = [
