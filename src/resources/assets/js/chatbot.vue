@@ -196,15 +196,38 @@ function downloadTextFile(filename, content) {
     window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+// Previously the conversation of every user was stored in this single key. It is now
+// only used as the prefix of the key of an individual user.
 const STORAGE_KEY = 'ask-biigle.messages';
+// The stored conversation is a convenience for the next page load and not an archive.
+// Keep it short so it cannot grow into the localStorage quota, which is shared with
+// the rest of BIIGLE.
+const MAX_STORED_MESSAGES = 10;
+
+// The conversation is stored per user, so the next person to log in on a shared
+// computer does not see it.
+function storageKey() {
+    const container = document.getElementById('ask-biigle-container');
+    const userId = container ? container.dataset.userId : null;
+
+    // Without a user the conversation is not stored at all, as a key that is not
+    // scoped would be shared with everyone who uses this browser.
+    return userId ? `${STORAGE_KEY}.${userId}` : null;
+}
 
 function loadMessages() {
+    const key = storageKey();
+
     try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        // Discard a conversation that was stored by a previous version of this module,
+        // which did not scope the key to a user.
+        localStorage.removeItem(STORAGE_KEY);
+
+        const stored = key ? localStorage.getItem(key) : null;
         if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed)) {
-                return parsed;
+                return parsed.slice(-MAX_STORED_MESSAGES);
             }
         }
     } catch {
@@ -215,11 +238,17 @@ function loadMessages() {
 }
 
 function saveMessages(messages) {
+    const key = storageKey();
+    if (!key) {
+        return;
+    }
+
     try {
-        if (messages && messages.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        const stored = (messages || []).slice(-MAX_STORED_MESSAGES);
+        if (stored.length > 0) {
+            localStorage.setItem(key, JSON.stringify(stored));
         } else {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(key);
         }
     } catch {
         // Fallback if localStorage access fails.
