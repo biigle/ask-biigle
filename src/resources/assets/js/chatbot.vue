@@ -150,6 +150,7 @@ import DOMPurify from 'dompurify';
 import {md5} from 'js-md5';
 import {marked, Renderer} from 'marked';
 import AskBiigleApi from './api/ask-biigle.js';
+import {Events} from './import.js';
 
 const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
@@ -475,6 +476,9 @@ export default {
             const message = this.input.trim();
             this.input = '';
             this.addMessage('user', message);
+            // Emitted here and not in doSend(), as a retry of a failed request would
+            // count the same question twice.
+            Events.emit('ask-biigle.asked_question');
             await this.doSend(message);
         },
         async doSend(message) {
@@ -613,6 +617,8 @@ export default {
             if (!message || message.role !== 'assistant' || !message.content) {
                 return;
             }
+
+            Events.emit('ask-biigle.reported_answer');
 
             const report = this.buildReportText(index);
             const body = [

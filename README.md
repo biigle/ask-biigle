@@ -61,5 +61,13 @@ A failed request is retried, with three attempts in total, so a value that is
 close to the timeout of a reverse proxy in front of BIIGLE can still result in
 a gateway timeout for the browser.
 
+## Metrics
+
+The chat emits the `ask-biigle.asked_question` and `ask-biigle.reported_answer`
+events whenever a question is sent or an answer is reported as incorrect. The
+[metrics](https://github.com/biigle/metrics) module counts these events and
+shows the counts in its admin area. Nothing is counted if that module is not
+installed, and no content of a question or answer is recorded either way.
+
 ## Arcana Update
 To update the arcana RAG system, execute `arcanaUpdate/rebuildRAG.py`. This script scrapes [https://biigle.de/manual](https://biigle.de/manual) and updates any modified files.
