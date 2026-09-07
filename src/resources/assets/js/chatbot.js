@@ -1,3 +1,3 @@
-import Chatbot from './chatbot.vue';
+import ChatbotLoader from './chatbotLoader.vue';
 
-biigle.$mount('ask-biigle-container', Chatbot);
+biigle.$mount('ask-biigle-container', ChatbotLoader);
