@@ -5,7 +5,9 @@ BIIGLE Manual HTML Downloader
 Crawls https://biigle.de/manual and downloads all manual HTML pages
 into the `manualhtml` directory using descriptive filenames derived from URL paths
 (e.g., `manual_annotations.html`).
-Also generates a `url_map.json` to keep track of URL-to-filename mappings.
+The URL-to-filename mapping is written to `src/resources/manual-url-map.json`. That
+file is part of the module, because the chat backend uses it to turn the file names
+that the RAG service reports as sources back into manual URLs.
 """
 
 import json
@@ -18,6 +20,9 @@ from urllib.request import Request, urlopen
 
 BASE_URL = "https://biigle.de/manual"
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "manualhtml")
+URL_MAP_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "src", "resources", "manual-url-map.json"
+)
 USER_AGENT = "Mozilla/5.0 (compatible; BiigleManualCrawler/1.0)"
 
 
@@ -138,14 +143,20 @@ def download_manual():
         except Exception as e:
             print(f"  ⚠️  Failed to download {current_url}: {e}", file=sys.stderr)
 
-    # Save mapping file
-    mapping_path = os.path.join(OUTPUT_DIR, "url_map.json")
+    # Save mapping file. The keys are sorted so an unchanged manual does not produce
+    # a diff that only reflects the order in which the pages were crawled.
+    mapping_path = os.path.abspath(URL_MAP_PATH)
+    os.makedirs(os.path.dirname(mapping_path), exist_ok=True)
     with open(mapping_path, "w", encoding="utf-8") as f:
         json.dump(
-            {"file_to_url": file_to_url, "url_to_file": url_to_file},
+            {
+                "file_to_url": dict(sorted(file_to_url.items())),
+                "url_to_file": dict(sorted(url_to_file.items())),
+            },
             f,
             indent=2,
         )
+        f.write("\n")
 
     print(f"\n🎉 Crawl finished! Downloaded {file_counter} pages.")
     print(f"📄 Mapping saved to: {mapping_path}")
