@@ -64,7 +64,7 @@
                                     :key="`${index}-chip-${sourceIndex}`"
                                     type="button"
                                     class="label label-default"
-                                    :title="source.title"
+                                    :title="source.url || source.title"
                                     @click="openSource(index, source.id)"
                                     >
                                     {{ source.id }}
@@ -87,7 +87,14 @@
                                     >
                                     <div class="ask-biigle-source-item__title">
                                         <strong>{{ source.id }}</strong>
-                                        <span>{{ source.title }}</span>
+                                        <a
+                                            v-if="source.url"
+                                            class="ask-biigle-source-item__name"
+                                            :href="source.url"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            >{{ source.url }}</a>
+                                        <span v-else class="ask-biigle-source-item__name">{{ source.title }}</span>
                                         <span v-if="source.score !== null" class="ask-biigle-source-score">
                                             {{ source.score.toFixed(3) }}
                                         </span>
@@ -603,7 +610,7 @@ export default {
                 lines.push('', 'Sources:');
                 message.sources.forEach((source) => {
                     const score = typeof source.score === 'number' ? ` (score ${source.score.toFixed(3)})` : '';
-                    lines.push(`[${source.id}] ${source.title}${score}`);
+                    lines.push(`[${source.id}] ${source.url || source.title}${score}`);
                     if (source.snippet) {
                         lines.push(`    ${source.snippet}`);
                     }
@@ -829,6 +836,12 @@ export default {
     align-items: baseline;
     display: flex;
     gap: 6px;
+}
+
+.ask-biigle-source-item__name {
+    // URLs and file names have no spaces to break at.
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .ask-biigle-source-score {

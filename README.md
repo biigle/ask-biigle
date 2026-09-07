@@ -71,3 +71,13 @@ installed, and no content of a question or answer is recorded either way.
 
 ## Arcana Update
 To update the arcana RAG system, execute `arcanaUpdate/rebuildRAG.py`. This script scrapes [https://biigle.de/manual](https://biigle.de/manual) and updates any modified files.
+
+The scraper stores the manual pages with file names that are derived from their URL
+(e.g. `manual_tutorials_notifications.html`) and writes the mapping between the two to
+`src/resources/manual-url-map.json`. Commit that file together with an arcana update, as
+the chat backend uses it to turn the file names into manual URLs: the file names are all
+the LLM knows about a page, so it would otherwise link to
+`manual_tutorials_notifications.html.md` instead of
+<https://biigle.de/manual/tutorials/notifications>. Links of an answer are repaired and
+the sources of an answer are shown as links whenever a file name can be resolved this
+way.

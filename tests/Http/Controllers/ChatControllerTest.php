@@ -257,6 +257,58 @@ class ChatControllerTest extends TestCase
         $this->assertSame(223, mb_strlen($done['sources'][0]['snippet']));
     }
 
+    public function testManualLinks()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "See [About](manual_tutorials_label-trees_about.html.md) and [more](RREF2).\n",
+                "\nReferences:\n",
+                "[RREF1] manual_tutorials_label-trees_about.html.md (0.521) First source text.\n",
+                '[RREF2] manual_tutorials_notifications.html.md (0.523) Second source text.',
+            ]),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
+        $response->assertStatus(200);
+
+        $done = $this->doneEvent($response->streamedContent());
+
+        // The LLM only knows the file names of the RAG index, so its links to the
+        // manual are replaced with the URLs of the scraped pages.
+        $this->assertSame(
+            'See [About](https://biigle.de/manual/tutorials/label-trees/about) and [more](https://biigle.de/manual/tutorials/notifications).',
+            $done['assistant']
+        );
+        $this->assertSame('https://biigle.de/manual/tutorials/label-trees/about', $done['sources'][0]['url']);
+        $this->assertSame('https://biigle.de/manual/tutorials/notifications', $done['sources'][1]['url']);
+    }
+
+    public function testManualLinksUnknownSource()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->configureBot();
+
+        Http::fake([
+            'https://chat-ai.academiccloud.de/*' => $this->fakeStream([
+                "Answer text.\n\nReferences:\n",
+                '[RREF1] goldenFacts.md (0.999) Example source snippet.',
+            ]),
+        ]);
+
+        $response = $this->json('POST', 'ask-biigle/chat', ['message' => 'Hello']);
+        $response->assertStatus(200);
+
+        $done = $this->doneEvent($response->streamedContent());
+
+        // Sources that are not manual pages have no URL.
+        $this->assertNull($done['sources'][0]['url']);
+    }
+
     public function testStreamedResponseUpstreamFailure()
     {
         $user = UserTest::create();

@@ -3,6 +3,7 @@
 namespace Biigle\Modules\AskBiigle\Http\Controllers;
 
 use Biigle\Http\Controllers\Views\Controller;
+use Biigle\Modules\AskBiigle\ManualUrls;
 use GuzzleHttp\Handler\StreamHandler;
 use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\Client\ConnectionException;
@@ -312,11 +313,12 @@ class ChatController extends Controller
                 }
 
                 $content = $this->normalizeNewlines($content);
+                $sources = $this->extractSources($content);
 
                 $this->sendEvent([
                     'type' => 'done',
-                    'assistant' => $this->cleanAssistantContent($content),
-                    'sources' => $this->extractSources($content),
+                    'assistant' => $this->cleanAssistantContent($content, $sources),
+                    'sources' => $sources,
                 ]);
             } catch (\Throwable $e) {
                 Log::error('AskBiigle stream failed: '.$e->getMessage());
@@ -436,9 +438,10 @@ class ChatController extends Controller
      * Remove retrieval/source artifacts from the assistant response.
      *
      * @param string $content
+     * @param array $sources
      * @return string
      */
-    protected function cleanAssistantContent($content)
+    protected function cleanAssistantContent($content, array $sources = [])
     {
         $cleaned = str_replace("\r\n", "\n", $content);
         $cleaned = preg_replace('/\n?-{3,}\s*References?:[\s\S]*$/i', '', $cleaned);
@@ -446,7 +449,18 @@ class ChatController extends Controller
         $cleaned = preg_replace('/\s*\[(?:RREF|REF)\d+\]/i', '', $cleaned);
         $cleaned = preg_replace("/\n{3,}/", "\n\n", $cleaned);
 
-        return trim($cleaned);
+        // The LLM only knows the file names of the RAG index, so it links to those
+        // instead of the manual pages they were scraped from. The links are repaired
+        // here, once the whole answer is known. The browser still shows the broken
+        // links of the stream until the cleaned answer replaces them.
+        $sourceUrls = [];
+        foreach ($sources as $source) {
+            if (!empty($source['url'])) {
+                $sourceUrls[$source['id']] = $source['url'];
+            }
+        }
+
+        return ManualUrls::replaceInContent(trim($cleaned), $sourceUrls);
     }
 
     /**
@@ -494,6 +508,7 @@ class ChatController extends Controller
             $sources[] = [
                 'id' => $id,
                 'title' => $title,
+                'url' => ManualUrls::forSource($title),
                 'score' => $score,
                 'snippet' => $snippet,
             ];
