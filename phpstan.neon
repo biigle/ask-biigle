@@ -1,0 +1,22 @@
+# This configuration can only be used from within a biigle/core installation, as the
+# module extends classes of the application. See .github/workflows/lint-php.yml.
+includes:
+    - ../../larastan/larastan/extension.neon
+
+parameters:
+
+    paths:
+        - src/
+
+    # Level 9 is the highest level
+    level: 5
+
+    parseModelCastsMethod: true
+
+    excludePaths:
+        # These files are not classes. They are included by the service provider or by
+        # Laravel, so the analysis has no way to know their context. The equivalent
+        # files of biigle/core live outside of app/ and are not analyzed either.
+        - src/config/
+        - src/resources/
+        - src/Http/routes.php
