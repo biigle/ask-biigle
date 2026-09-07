@@ -29,6 +29,11 @@ works with the Chat AI service of the GWDG.
 
 After configuration, a new chat button appears in the BIIGLE navbar-right and opens the ask BIIGLE modal.
 
+Each answer has a button to report it as incorrect. It opens the mail client of
+the user with the question, the answer, its sources and an MD5 checksum of that
+text. The report is sent to the `ADMIN_EMAIL` of biigle/core, so the button is
+hidden if that variable is not set.
+
 ### API Key
 
 To retrieve an API key (`ASK_BIIGLE_LLM_API_KEY`), please refer to the [GWDG SAIA API Request Documentation](https://docs.hpc.gwdg.de/services/ai-services/saia/index.html#api-request).

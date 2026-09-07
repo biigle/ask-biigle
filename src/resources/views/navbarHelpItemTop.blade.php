@@ -6,6 +6,10 @@
 
 @once
     @push('scripts')
+        {{-- Must be declared before the chatbot module is loaded below. --}}
+        <script type="module">
+            biigle.$declare('askBiigle.adminEmail', @json(config('biigle.admin_email')));
+        </script>
         {{vite_hot(base_path('vendor/biigle/ask-biigle/hot'), ['src/resources/assets/js/chatbot.js'], 'vendor/ask-biigle')}}
     @endpush
 @endonce
