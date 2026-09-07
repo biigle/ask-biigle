@@ -17,34 +17,30 @@ class AskBiigleServiceProvider extends ServiceProvider
      */
     public function boot(Modules $modules, Router $router)
     {
-        $this->loadViewsFrom(__DIR__ . "/resources/views", "ask-biigle");
+        $this->loadViewsFrom(__DIR__.'/resources/views', 'ask-biigle');
 
-        $router->group(
-            [
-                "namespace" => "Biigle\Modules\AskBiigle\Http\Controllers",
-                "middleware" => "web",
+        $router->group([
+            'namespace' => 'Biigle\Modules\AskBiigle\Http\Controllers',
+            'middleware' => 'web',
+        ], function ($router) {
+            require __DIR__.'/Http/routes.php';
+        });
+
+        $modules->register('ask-biigle', [
+            'viewMixins' => [
+                'navbarHelpItemTop',
             ],
-            function ($router) {
-                require __DIR__ . "/Http/routes.php";
-            },
-        );
-
-        $modules->register("ask-biigle", [
-            "viewMixins" => ["navbarHelpItemTop"],
-            "controllerMixins" => [
+            'controllerMixins' => [
                 //
             ],
-            "apidoc" => [
+            'apidoc' => [
                 //__DIR__.'/Http/Controllers/Api/',
             ],
         ]);
 
-        $this->publishes(
-            [
-                __DIR__ . "/public" => public_path("vendor/ask-biigle"),
-            ],
-            "public",
-        );
+        $this->publishes([
+            __DIR__.'/public' => public_path('vendor/ask-biigle'),
+        ], 'public');
     }
 
     /**
@@ -54,6 +50,6 @@ class AskBiigleServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . "/config/ask-biigle.php", "ask-biigle");
+        $this->mergeConfigFrom(__DIR__.'/config/ask-biigle.php', 'ask-biigle');
     }
 }
