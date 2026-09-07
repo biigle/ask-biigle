@@ -1,6 +1,6 @@
 {
   "src/resources/assets/js/chatbot.js": {
-    "file": "assets/chatbot-BEYlGDw1.js",
+    "file": "assets/chatbot-DA8RbSox.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.js",
     "isEntry": true,
@@ -9,7 +9,7 @@
     ]
   },
   "src/resources/assets/js/chatbot.vue": {
-    "file": "assets/chatbot-BRSE9Cs5.js",
+    "file": "assets/chatbot-B0TokDXY.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.vue",
     "isDynamicEntry": true,

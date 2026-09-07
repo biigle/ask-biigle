@@ -34,6 +34,10 @@ the user with the question, the answer, its sources and an MD5 checksum of that
 text. The report is sent to the `ADMIN_EMAIL` of biigle/core, so the button is
 hidden if that variable is not set.
 
+The chat also has a "Contact a human" button, which opens an empty mail to the
+same address. It is hidden along with the report button if `ADMIN_EMAIL` is not
+set.
+
 ### API Key
 
 To retrieve an API key (`ASK_BIIGLE_LLM_API_KEY`), please refer to the [GWDG SAIA API Request Documentation](https://docs.hpc.gwdg.de/services/ai-services/saia/index.html#api-request).
