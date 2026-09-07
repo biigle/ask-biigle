@@ -1,3 +1,5 @@
 /vendor
 /node_modules
 hot
+/.php-cs-fixer.cache
+/composer.lock
