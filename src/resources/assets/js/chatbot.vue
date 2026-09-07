@@ -99,7 +99,7 @@
                             </div>
                         </div>
                         <button
-                            v-if="message.role === 'assistant' && message.content"
+                            v-if="canReport && message.role === 'assistant' && message.content"
                             type="button"
                             class="btn btn-link btn-xs ask-biigle-report-btn"
                             title="Report this answer as incorrect by email"
@@ -139,13 +139,21 @@
 
 <script>
 import DOMPurify from 'dompurify';
+import {md5} from 'js-md5';
 import {marked, Renderer} from 'marked';
 import AskBiigleApi from './api/ask-biigle.js';
 
 const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
-const REPORT_EMAIL = 'info@biigle.de';
 const REPORT_SUBJECT = 'Ask BIIGLE: incorrect answer';
+// The checksum is computed for the text between these markers, so the BIIGLE team can
+// recompute it (e.g. with md5sum) for the same text of the received email.
+const REPORT_BEGIN = '----- BEGIN ASK BIIGLE REPORT -----';
+const REPORT_END = '----- END ASK BIIGLE REPORT -----';
+// Mail clients and operating systems cut off very long mailto: links, so the report is
+// capped. The checksum is computed after truncating and matches the text of the email.
+const MAX_ANSWER_CHARS = 1500;
+const MAX_REPORT_CHARS = 3000;
 
 // Open links in a new tab; rel="noopener noreferrer" prevents reverse tabnabbing.
 // This must happen in a hook because "target" is not in DOMPurify's default list of
@@ -182,18 +190,16 @@ marked.use({
     },
 });
 
-// A mailto: link cannot carry an attachment, so the report text is offered as a file
-// download instead and the mail body asks the user to attach the downloaded file.
-function downloadTextFile(filename, content) {
-    const url = URL.createObjectURL(new Blob([content], {type: 'text/plain;charset=utf-8'}));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    // Revoking immediately would cancel a download that has not started yet.
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+// The report is sent to the admin_email of biigle/core, which the navbarHelpItemTop
+// view declares for the JS. $require() returns an empty object if it was not declared.
+function reportEmail() {
+    const email = biigle.$require('askBiigle.adminEmail');
+
+    return typeof email === 'string' ? email : '';
+}
+
+function truncate(value, limit) {
+    return value.length > limit ? `${value.slice(0, limit)}\n[...truncated]` : value;
 }
 
 // Previously the conversation of every user was stored in this single key. It is now
@@ -274,6 +280,9 @@ export default {
         };
     },
     computed: {
+        canReport() {
+            return reportEmail().length > 0;
+        },
         canSend() {
             return this.input.trim().length > 0;
         },
@@ -568,7 +577,7 @@ export default {
                 question || '(unknown)',
                 '',
                 'Answer:',
-                stripReferences(message.content),
+                truncate(stripReferences(message.content), MAX_ANSWER_CHARS),
             ];
 
             if (message.sources.length > 0) {
@@ -582,7 +591,7 @@ export default {
                 });
             }
 
-            return lines.join('\n');
+            return truncate(lines.join('\n'), MAX_REPORT_CHARS);
         },
         reportMessage(index) {
             const message = this.messages[index];
@@ -590,26 +599,24 @@ export default {
                 return;
             }
 
-            const filename = `ask-biigle-report-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
-            downloadTextFile(filename, this.buildReportText(index));
-
+            const report = this.buildReportText(index);
             const body = [
                 'Hello BIIGLE team,',
                 '',
                 'I would like to report an incorrect answer of the Ask BIIGLE assistant.',
                 '',
-                `The question, the answer and its sources were saved to the file "${filename}", which was just downloaded to this computer. Please attach that file to this email.`,
-                '',
                 'What is wrong with the answer:',
                 '',
+                '',
+                REPORT_BEGIN,
+                report,
+                REPORT_END,
+                `MD5: ${md5(report)}`,
+                '',
+                'Please leave the text between the two markers unchanged, otherwise its checksum will no longer match.',
             ].join('\n');
 
-            const mailto = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(REPORT_SUBJECT)}&body=${encodeURIComponent(body)}`;
-            // Opening the mail client in the same tick can cancel the download in some
-            // browsers, so give the download a moment to start.
-            window.setTimeout(() => {
-                window.location.href = mailto;
-            }, 250);
+            window.location.href = `mailto:${reportEmail()}?subject=${encodeURIComponent(REPORT_SUBJECT)}&body=${encodeURIComponent(body)}`;
         },
         retryMessage(errorIndex) {
             const errorMsg = this.messages[errorIndex];
