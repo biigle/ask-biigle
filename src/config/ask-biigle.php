@@ -13,7 +13,7 @@ PROMPT;
 return [
     'llm_api_url' => env('ASK_BIIGLE_LLM_API_URL', 'https://chat-ai.academiccloud.de/v1/chat/completions'),
     'llm_api_key' => env('ASK_BIIGLE_LLM_API_KEY'),
-    'llm_algorithm' => env('ASK_BIIGLE_LLM_ALGORITHM', 'qwen3-30b-a3b-instruct-2507'),
+    'llm_algorithm' => env('ASK_BIIGLE_LLM_ALGORITHM', 'qwen3.6-35b-a3b'),
     'llm_inference_service' => env('ASK_BIIGLE_LLM_INFERENCE_SERVICE', 'saia-openai-gateway'),
     'llm_arcana_id' => env('ASK_BIIGLE_LLM_ARCANA_ID', 'd.langenkaemper/BiigleManual'),
     'llm_system_prompt' => env('ASK_BIIGLE_LLM_SYSTEM_PROMPT', $defaultSystemPrompt),

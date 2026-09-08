@@ -15,7 +15,7 @@ Configure the chatbot backend in the BIIGLE `.env`:
 
 - `ASK_BIIGLE_LLM_API_URL` (default: `https://chat-ai.academiccloud.de/v1/chat/completions`)
 - `ASK_BIIGLE_LLM_API_KEY` (required, see [API Key](#api-key))
-- `ASK_BIIGLE_LLM_ALGORITHM` (default: `qwen3-30b-a3b-instruct-2507`)
+- `ASK_BIIGLE_LLM_ALGORITHM` (default: `qwen3.6-35b-a3b`)
 - `ASK_BIIGLE_LLM_INFERENCE_SERVICE` (default: `saia-openai-gateway`)
 - `ASK_BIIGLE_LLM_ARCANA_ID` (default: `d.langenkaemper/BiigleManual`, see [Arcana](#arcana))
 - `ASK_BIIGLE_LLM_SYSTEM_PROMPT` (default: the prompt at the top of `src/config/ask-biigle.php`)
