@@ -38,7 +38,7 @@
                     >
                     <div class="ask-biigle-bubble">
                         <div class="ask-biigle-bubble__role">{{ roleLabel(message.role) }}</div>
-                        <div v-if="message.role === 'assistant' && !message.content" class="ask-biigle-typing-indicator">
+                        <div v-if="message.role === 'assistant' && message.streaming && !message.content" class="ask-biigle-typing-indicator">
                             <span class="ask-biigle-typing-dot"></span>
                             <span class="ask-biigle-typing-dot"></span>
                             <span class="ask-biigle-typing-dot"></span>
@@ -164,6 +164,7 @@ const Modal = biigle.$require('uiv.modal');
 const MAX_HISTORY_ITEMS = 20;
 const REPORT_SUBJECT = 'Ask BIIGLE: incorrect answer';
 const CONTACT_SUBJECT = 'Ask BIIGLE: contact request';
+const EMPTY_ANSWER_ERROR = 'The AI service returned an empty answer. Please click Retry to try again.';
 // The checksum is computed for the text between these markers, so the BIIGLE team can
 // recompute it (e.g. with md5sum) for the same text of the received email.
 const REPORT_BEGIN = '----- BEGIN ASK BIIGLE REPORT -----';
@@ -499,6 +500,10 @@ export default {
                 sources: [],
                 sourcesExpanded: false,
                 activeSourceId: null,
+                // Only a message of a running request shows the typing indicator. An
+                // answer that stays empty is reported as an error below, so the
+                // indicator cannot outlive the request that it belongs to.
+                streaming: true,
             });
             const assistantMsg = this.messages[this.messages.length - 1];
             // Pin the question so it stays in view while the answer is streamed below it.
@@ -534,9 +539,20 @@ export default {
                     }
                 }, (doneEvent) => {
                     flushBuffer();
-                    if (typeof doneEvent.assistant === 'string') {
+                    // The cleaned answer replaces the streamed text, unless it is empty.
+                    // Cleaning can strip everything (e.g. of an answer that consists of
+                    // nothing but a reference section), which would otherwise discard an
+                    // answer that was already displayed.
+                    if (typeof doneEvent.assistant === 'string' && doneEvent.assistant.length > 0) {
                         assistantMsg.content = doneEvent.assistant;
                     }
+
+                    // Nothing is left to render, so the request is treated as failed
+                    // instead of leaving an empty bubble behind.
+                    if (stripReferences(assistantMsg.content).length === 0) {
+                        throw new Error(EMPTY_ANSWER_ERROR);
+                    }
+
                     assistantMsg.sources = doneEvent.sources;
                     this.scrollPinnedMessageToTop();
                 }, {signal: this.abortController.signal});
@@ -566,6 +582,7 @@ export default {
                 this.addMessage('error', errorMessage, [], message);
             } finally {
                 flushBuffer();
+                assistantMsg.streaming = false;
                 // Unpin only after the pending scroll of the last update was applied.
                 this.$nextTick(() => this.unpinMessage());
                 // The messages are stored only here and not on every update of the
