@@ -27,7 +27,8 @@
                 @scroll="handleScroll"
                 >
                 <p v-if="messages.length === 0" class="text-muted ask-biigle-empty">
-                    Ask anything about using BIIGLE.
+                    Your AI-powered guide to the BIIGLE manual.<br>
+                    It can answer questions about tools, annotation workflows, configuration, or platform features.
                 </p>
                 <div
                     v-for="(message, index) in messages"
