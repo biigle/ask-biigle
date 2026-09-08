@@ -37,6 +37,14 @@ export default defineConfig(({command}) => ({
             scss: {
                 // SCSS of biigle/core, relative to the module root in vendor/biigle/*.
                 loadPaths: ['../../../resources/assets/sass'],
+                // Silence deprecations by the Bootstrap SCSS of biigle/core.
+                silenceDeprecations: [
+                    'import',
+                    'if-function',
+                    'color-functions',
+                    'global-builtin',
+                    'slash-div',
+                ],
             },
         },
     },
