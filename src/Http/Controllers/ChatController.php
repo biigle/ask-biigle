@@ -275,10 +275,18 @@ class ChatController extends Controller
             $body = $response->toPsrResponse()->getBody();
             $content = '';
             $pending = '';
+            // Kept for the log message of an empty answer, which is the only place where
+            // the upstream response can be inspected after the fact.
+            $frames = 0;
+            $lastLine = '';
 
             try {
                 while (!$body->eof() && !connection_aborted()) {
                     $line = rtrim(Utils::readLine($body), "\r\n");
+                    if ($line !== '') {
+                        $lastLine = $line;
+                    }
+
                     if (!str_starts_with($line, 'data:')) {
                         continue;
                     }
@@ -287,6 +295,8 @@ class ChatController extends Controller
                     if ($data === '' || $data === '[DONE]') {
                         continue;
                     }
+
+                    $frames++;
 
                     $delta = $this->extractDelta(json_decode($data, true));
                     if ($delta === '') {
@@ -314,10 +324,22 @@ class ChatController extends Controller
 
                 $content = $this->normalizeNewlines($content);
                 $sources = $this->extractSources($content);
+                $assistant = $this->cleanAssistantContent($content, $sources);
+
+                // The browser shows an error for an empty answer but cannot tell why it
+                // is empty, as it only receives the events of this endpoint and never
+                // the response of the upstream service.
+                if ($assistant === '') {
+                    Log::warning(sprintf(
+                        'AskBiigle received an empty answer from the upstream service. Data frames: %d. Last line: %s',
+                        $frames,
+                        $lastLine === '' ? '(none)' : mb_strimwidth($lastLine, 0, 500, '...')
+                    ));
+                }
 
                 $this->sendEvent([
                     'type' => 'done',
-                    'assistant' => $this->cleanAssistantContent($content, $sources),
+                    'assistant' => $assistant,
                     'sources' => $sources,
                 ]);
             } catch (\Throwable $e) {
