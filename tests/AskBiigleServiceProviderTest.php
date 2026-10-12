@@ -57,11 +57,12 @@ class AskBiigleServiceProviderTest extends TestCase
         $this->be(UserTest::create());
         $this->withoutVite();
 
-        $view = view('ask-biigle::navbarHelpItemTop')->render();
+        $scripts = $this->renderScripts();
 
         // Without a privacy notice there is nothing to confirm.
-        $this->assertStringNotContainsString('askBiigle.privacyUrl', $view);
-        $this->assertStringNotContainsString('askBiigle.confirmedPrivacy', $view);
+        $this->assertStringContainsString('askBiigle.adminEmail', $scripts);
+        $this->assertStringNotContainsString('askBiigle.privacyUrl', $scripts);
+        $this->assertStringNotContainsString('askBiigle.confirmedPrivacy', $scripts);
     }
 
     public function testViewMixinWithPrivacyNotice()
@@ -70,15 +71,15 @@ class AskBiigleServiceProviderTest extends TestCase
         $this->be($user);
         $this->withoutVite();
         $this->withPrivacyNotice(function () use ($user) {
-            $view = view('ask-biigle::navbarHelpItemTop')->render();
-            $this->assertStringContainsString("biigle.\$declare('askBiigle.privacyUrl', ".json_encode(route('privacy')).')', $view);
-            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', false)", $view);
+            $scripts = $this->renderScripts();
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.privacyUrl', ".json_encode(route('privacy')).')', $scripts);
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', false)", $scripts);
 
             $user->setSettings(['ask_biigle_confirmed_privacy' => true]);
             $user->save();
 
-            $view = view('ask-biigle::navbarHelpItemTop')->render();
-            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', true)", $view);
+            $scripts = $this->renderScripts();
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', true)", $scripts);
         });
     }
 
@@ -94,6 +95,18 @@ class AskBiigleServiceProviderTest extends TestCase
             ->assertStatus(200);
 
         $this->assertTrue($user->fresh()->getSettings('ask_biigle_confirmed_privacy'));
+    }
+
+    /**
+     * Render the view mixin and return what it pushed to the scripts stack.
+     */
+    protected function renderScripts()
+    {
+        // The declarations are pushed once per page, so start with a fresh page.
+        View::flushState();
+        view('ask-biigle::navbarHelpItemTop')->render();
+
+        return View::yieldPushContent('scripts');
     }
 
     /**
