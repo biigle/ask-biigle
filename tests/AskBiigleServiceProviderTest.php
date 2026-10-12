@@ -5,6 +5,7 @@ namespace Biigle\Tests\Modules\AskBiigle;
 use Biigle\Facades\Modules;
 use Biigle\Modules\AskBiigle\AskBiigleServiceProvider;
 use Biigle\Tests\UserTest;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
@@ -104,9 +105,10 @@ class AskBiigleServiceProviderTest extends TestCase
     {
         // The declarations are pushed once per page, so start with a fresh page.
         View::flushState();
-        view('ask-biigle::navbarHelpItemTop')->render();
 
-        return View::yieldPushContent('scripts');
+        // Yield the stack in the same render because the pushes are flushed once
+        // rendering is done.
+        return Blade::render("@include('ask-biigle::navbarHelpItemTop')\n@stack('scripts')");
     }
 
     /**
