@@ -38,6 +38,11 @@ The chat also has a "Contact a human" button, which opens an empty mail to the
 same address. It is hidden along with the report button if `ADMIN_EMAIL` is not
 set.
 
+If the BIIGLE instance has a privacy notice (a `privacy` view), users have to
+confirm it once before they can send a question, because the questions are sent
+to an external AI service. The confirmation is stored in the user settings as
+`ask_biigle_confirmed_privacy`.
+
 ### API Key
 
 To retrieve an API key (`ASK_BIIGLE_LLM_API_KEY`), please refer to the [GWDG SAIA API Request Documentation](https://docs.hpc.gwdg.de/services/ai-services/saia/index.html#api-request).

@@ -2,6 +2,7 @@
 
 namespace Biigle\Modules\AskBiigle;
 
+use Biigle\Http\Requests\UpdateUserSettings;
 use Biigle\Services\Modules;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
@@ -37,6 +38,10 @@ class AskBiigleServiceProvider extends ServiceProvider
                 //__DIR__.'/Http/Controllers/Api/',
             ],
         ]);
+
+        // Users confirm the privacy notice of the instance once before they can use the
+        // chat. The flag is only checked if the instance has a privacy notice.
+        UpdateUserSettings::addRule('ask_biigle_confirmed_privacy', 'filled|bool');
 
         $this->publishes([
             __DIR__.'/public' => public_path('vendor/ask-biigle'),

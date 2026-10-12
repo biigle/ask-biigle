@@ -5,7 +5,10 @@ namespace Biigle\Tests\Modules\AskBiigle;
 use Biigle\Facades\Modules;
 use Biigle\Modules\AskBiigle\AskBiigleServiceProvider;
 use Biigle\Tests\UserTest;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use TestCase;
 
 class AskBiigleServiceProviderTest extends TestCase
@@ -48,5 +51,80 @@ class AskBiigleServiceProviderTest extends TestCase
         $this->assertStringContainsString('ask-biigle:open', $view);
         // The user ID scopes the stored conversation to the current user.
         $this->assertStringContainsString('data-user-id="'.$user->id.'"', $view);
+    }
+
+    public function testViewMixinWithoutPrivacyNotice()
+    {
+        $this->be(UserTest::create());
+        $this->withoutVite();
+
+        $scripts = $this->renderScripts();
+
+        // Without a privacy notice there is nothing to confirm.
+        $this->assertStringContainsString('askBiigle.adminEmail', $scripts);
+        $this->assertStringNotContainsString('askBiigle.privacyUrl', $scripts);
+        $this->assertStringNotContainsString('askBiigle.confirmedPrivacy', $scripts);
+    }
+
+    public function testViewMixinWithPrivacyNotice()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+        $this->withoutVite();
+        $this->withPrivacyNotice(function () use ($user) {
+            $scripts = $this->renderScripts();
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.privacyUrl', ".json_encode(route('privacy')).')', $scripts);
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', false)", $scripts);
+
+            $user->setSettings(['ask_biigle_confirmed_privacy' => true]);
+            $user->save();
+
+            $scripts = $this->renderScripts();
+            $this->assertStringContainsString("biigle.\$declare('askBiigle.confirmedPrivacy', true)", $scripts);
+        });
+    }
+
+    public function testConfirmPrivacySetting()
+    {
+        $user = UserTest::create();
+        $this->be($user);
+
+        $this->putJson('api/v1/users/my/settings', ['ask_biigle_confirmed_privacy' => 'abc'])
+            ->assertStatus(422);
+
+        $this->putJson('api/v1/users/my/settings', ['ask_biigle_confirmed_privacy' => true])
+            ->assertStatus(200);
+
+        $this->assertTrue($user->fresh()->getSettings('ask_biigle_confirmed_privacy'));
+    }
+
+    /**
+     * Render the view mixin and return what it pushed to the scripts stack.
+     */
+    protected function renderScripts()
+    {
+        // The declarations are pushed once per page, so start with a fresh page.
+        View::flushState();
+
+        // Yield the stack in the same render because the pushes are flushed once
+        // rendering is done.
+        return Blade::render("@include('ask-biigle::navbarHelpItemTop')\n@stack('scripts')");
+    }
+
+    /**
+     * Run the callback while the instance has a privacy notice.
+     */
+    protected function withPrivacyNotice(callable $callback)
+    {
+        $path = sys_get_temp_dir().'/ask-biigle-test-views-'.uniqid();
+        File::makeDirectory($path);
+        File::put("{$path}/privacy.blade.php", 'Privacy notice');
+        View::addLocation($path);
+
+        try {
+            $callback();
+        } finally {
+            File::deleteDirectory($path);
+        }
     }
 }
