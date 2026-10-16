@@ -64,6 +64,9 @@ class ChatControllerTest extends TestCase
 
         // The upstream response is always requested as a stream.
         Http::assertSent(fn ($request) => $request['stream'] === true);
+
+        // Tool use of the LLM is always disabled.
+        Http::assertSent(fn ($request) => $request['enable-tools'] === false);
     }
 
     public function testUpstreamFailure()
@@ -372,7 +375,6 @@ class ChatControllerTest extends TestCase
             'ask-biigle.llm_algorithm' => 'test-model',
             'ask-biigle.llm_inference_service' => 'saia-openai-gateway',
             'ask-biigle.llm_arcana_id' => 'arcana-123',
-            'ask-biigle.llm_enable_tools' => true,
             'ask-biigle.llm_temperature' => 0.3,
             'ask-biigle.llm_top_p' => 0.9,
             'ask-biigle.llm_system_prompt' => 'You are an assistant.',

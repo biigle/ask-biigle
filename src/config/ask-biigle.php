@@ -17,7 +17,6 @@ return [
     'llm_inference_service' => env('ASK_BIIGLE_LLM_INFERENCE_SERVICE', 'saia-openai-gateway'),
     'llm_arcana_id' => env('ASK_BIIGLE_LLM_ARCANA_ID', 'd.langenkaemper/BiigleManual'),
     'llm_system_prompt' => env('ASK_BIIGLE_LLM_SYSTEM_PROMPT', $defaultSystemPrompt),
-    'llm_enable_tools' => env('ASK_BIIGLE_LLM_ENABLE_TOOLS', true),
     'llm_temperature' => env('ASK_BIIGLE_LLM_TEMPERATURE', 0.0),
     'llm_top_p' => env('ASK_BIIGLE_LLM_TOP_P', 0.05),
     'llm_timeout' => (int) env('ASK_BIIGLE_LLM_TIMEOUT', 29),

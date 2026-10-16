@@ -83,7 +83,10 @@ class ChatController extends Controller
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'enable-tools' => (bool) config('ask-biigle.llm_enable_tools'),
+            // Tool use is disabled because only the text content of the upstream stream
+            // is relayed to the browser. A tool call would arrive as a delta without
+            // content, so the answer would stay empty.
+            'enable-tools' => false,
             'temperature' => (float) config('ask-biigle.llm_temperature'),
             'top_p' => (float) config('ask-biigle.llm_top_p'),
             'stream' => true,

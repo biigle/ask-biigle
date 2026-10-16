@@ -19,13 +19,16 @@ Configure the chatbot backend in the BIIGLE `.env`:
 - `ASK_BIIGLE_LLM_INFERENCE_SERVICE` (default: `saia-openai-gateway`)
 - `ASK_BIIGLE_LLM_ARCANA_ID` (default: `d.langenkaemper/BiigleManual`, see [Arcana](#arcana))
 - `ASK_BIIGLE_LLM_SYSTEM_PROMPT` (default: the prompt at the top of `src/config/ask-biigle.php`)
-- `ASK_BIIGLE_LLM_ENABLE_TOOLS` (default: `true`)
 - `ASK_BIIGLE_LLM_TEMPERATURE` (default: `0.0`)
 - `ASK_BIIGLE_LLM_TOP_P` (default: `0.05`)
 - `ASK_BIIGLE_LLM_TIMEOUT` (default: `29`, see [Timeout](#timeout))
 
 Only the API key has to be configured. All other variables have a default that
 works with the Chat AI service of the GWDG.
+
+Tool use of the LLM is always disabled, as the chat only relays the text content
+of an answer to the browser. A previously configured
+`ASK_BIIGLE_LLM_ENABLE_TOOLS` is ignored.
 
 After configuration, a new chat button appears in the BIIGLE navbar-right and opens the ask BIIGLE modal.
 
