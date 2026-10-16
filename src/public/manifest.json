@@ -1,6 +1,6 @@
 {
   "src/resources/assets/js/chatbot.js": {
-    "file": "assets/chatbot-CeOO6oV1.js",
+    "file": "assets/chatbot-BQKwDzQX.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.js",
     "isEntry": true,
@@ -9,7 +9,7 @@
     ]
   },
   "src/resources/assets/js/chatbot.vue": {
-    "file": "assets/chatbot-C-OPXDbd.js",
+    "file": "assets/chatbot-B0RDO5fi.js",
     "name": "chatbot",
     "src": "src/resources/assets/js/chatbot.vue",
     "isDynamicEntry": true,
@@ -17,7 +17,7 @@
       "src/resources/assets/js/chatbot.js"
     ],
     "css": [
-      "assets/chatbot-DPZbctia.css"
+      "assets/chatbot-Br4sjwLu.css"
     ]
   }
 }
